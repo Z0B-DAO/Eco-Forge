@@ -12,6 +12,7 @@
     "@lighthouse-web3/sdk": "^0.4.4",
     "@rainbow-me/rainbowkit": "^2.2.10",
     "@tanstack/react-query": "^5.90.21",
+    "@walletconnect/ethereum-provider": "^2.23.6",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
