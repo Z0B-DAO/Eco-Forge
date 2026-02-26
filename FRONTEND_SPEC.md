@@ -50,12 +50,12 @@ Crédits soumis directement par un porteur de projet, sans passer par un registr
 | Route | Page | Description |
 |---|---|---|
 | `/` | Landing | Présentation du projet, stats globales, CTA "Launch App" |
-| `/dashboard` | Dashboard | Vue d'ensemble : tes crédits, tes stakes, activité récente |
-| `/marketplace` | Marketplace | Browse tous les crédits listés, filtres (type, région, score), acheter |
-| `/marketplace/[creditId]` | Détail crédit | Toutes les infos d'un crédit : metadata, score AI, historique, bouton buy/sell |
+| `/dashboard` | Dashboard | Vue d'ensemble : crédits, governance tokens, progression paliers, activité récente |
+| `/marketplace` | Marketplace | Browse tous les crédits, **barre de recherche**, filtres, acheter, signaler |
+| `/marketplace/[creditId]` | Détail crédit | Toutes les infos, score AI, historique, buy/sell, **bouton Challenge** |
 | `/create` | Créer un crédit | Choix du type (Certified ou Community), puis formulaire adapté |
-| `/predictions` | Prediction Market | Liste des prédictions actives, odds en temps réel |
-| `/predictions/[predictionId]` | Détail prédiction | Question, odds, graphe YES/NO, staker AVAX, insight AI |
+| ~~`/predictions`~~ | ~~Prediction Market~~ | ~~V2 — NOT IN MVP~~ |
+| ~~`/predictions/[predictionId]`~~ | ~~Détail prédiction~~ | ~~V2 — NOT IN MVP~~ |
 | `/governance` | Gouvernance | Liste des proposals + disputes actives |
 | `/governance/[proposalId]` | Détail proposal | Description, votes pour/contre, voter |
 | `/governance/disputes` | Disputes | Crédits contestés, formulaire de challenge |
@@ -91,7 +91,9 @@ Crédits soumis directement par un porteur de projet, sans passer par un registr
 | `ImpactScoreBadge` | Badge visuel coloré 0-100 (rouge → vert) |
 | `TradePanel` | Interface buy/sell : quantité, prix total en AVAX, bouton signer |
 | `RetireButton` | Burn des crédits (offset carbone permanent) |
-| `CreditFilters` | Filtres : type de projet, région, range de score, prix, **origine (Certified / Community / All)** |
+| `ChallengeButton` | Bouton "Challenge this credit" visible sur chaque crédit → ouvre DisputeForm |
+| `SearchBar` | Recherche par nom de projet, région, type, ID on-chain. Filtrage client-side sur les données déjà chargées |
+| `CreditFilters` | Filtres : type de projet, région, range de score, prix, **origine (Certified / Community / All)**, **status (Verified / Pending / Disputed)** |
 
 ### AI
 
@@ -102,14 +104,9 @@ Crédits soumis directement par un porteur de projet, sans passer par un registr
 | `AIInsightCard` | Card générique pour afficher un insight AI (réutilisable) |
 | `AnalyzeButton` | Bouton qui trigger le Server Action et affiche un loading pendant l'appel Claude (~3-5s) |
 
-### Predictions
+### ~~Predictions~~ [V2 — NOT IN MVP]
 
-| Composant | Rôle |
-|---|---|
-| `PredictionCard` | Card : question, odds YES/NO, temps restant, total staké |
-| `StakePanel` | Choisir YES/NO, montant AVAX, signer tx |
-| `OddsBar` | Barre visuelle YES vs NO en pourcentage |
-| `ClaimButton` | Récupérer gains après résolution |
+> Composants PredictionCard, StakePanel, OddsBar, ClaimButton — reportés en V2.
 
 ### Governance
 
@@ -117,8 +114,17 @@ Crédits soumis directement par un porteur de projet, sans passer par un registr
 |---|---|
 | `ProposalCard` | Card : titre, type, votes pour/contre, deadline |
 | `VotePanel` | Voter FOR/AGAINST, affiche ton voting power |
-| `DisputeForm` | Formulaire : sélectionner un crédit, écrire la raison, soumettre dispute |
-| `DisputeCard` | Card d'une dispute active avec status |
+| `DisputeForm` | Formulaire : raison + **stake de tokens** requis pour soumettre. Affiche le coût en tokens avant confirmation |
+| `DisputeCard` | Card d'une dispute active avec status + montant staké par le challenger |
+
+### Rewards & Progression
+
+| Composant | Rôle |
+|---|---|
+| `MilestoneProgress` | Barre de progression vers le prochain palier (ex: "12/15 actions → Tier 2") |
+| `MilestoneList` | Liste de tous les paliers avec status (atteint / en cours / verrouillé) |
+| `TokenBalance` | Affiche le nombre de governance tokens + voting power |
+| `RewardToast` | Notification quand un nouveau palier est atteint ("Tier 3 reached! +3 tokens") |
 
 ### Charts
 
@@ -126,7 +132,7 @@ Crédits soumis directement par un porteur de projet, sans passer par un registr
 |---|---|
 | `PriceChart` | Historique de prix d'un crédit (Recharts line chart) |
 | `ScoreHistoryChart` | Evolution du score AI dans le temps |
-| `PoolChart` | Répartition YES/NO dans une prediction pool (pie/bar) |
+| `VoteChart` | Barre de progression FOR vs AGAINST sur les proposals |
 
 ### Common
 
@@ -145,17 +151,17 @@ Crédits soumis directement par un porteur de projet, sans passer par un registr
 |---|---|
 | `useCredits()` | Lit les credit types depuis le contrat CarbonCredit |
 | `useCreditDetail(id)` | Lit un crédit spécifique + son score + metadata IPFS |
+| `useSearchCredits(query)` | Filtre les crédits chargés par nom, région, type, ID |
 | `useMarketplace()` | Lit les listings actifs depuis le contrat Marketplace |
 | `useBuyCredit()` | Prépare + envoie la tx `buyCredits()` |
 | `useListCredit()` | Prépare + envoie la tx `listCredits()` |
 | `useRetireCredit()` | Prépare + envoie la tx `retireCredits()` |
-| `usePredictions()` | Lit les prédictions actives depuis PredictionPool |
-| `useStake()` | Prépare + envoie la tx `stake()` |
-| `useClaim()` | Prépare + envoie la tx `claim()` |
 | `useProposals()` | Lit les proposals depuis EcoForgeGovernance |
 | `useVote()` | Prépare + envoie la tx `vote()` |
-| `useDispute()` | Prépare + envoie la tx `disputeCredit()` |
-| `useUserPortfolio(address)` | Lit les balances ERC-1155 de l'user + crédits retirés |
+| `useDispute()` | Prépare + envoie la tx `disputeCredit()` → auto-crée une proposal |
+| `useGovernanceToken()` | Lit le balance de EcoForgeToken de l'user (= voting power) |
+| `useMilestoneProgress()` | Lit actions count, palier actuel, progression vers le prochain palier |
+| `useUserPortfolio(address)` | Lit les balances ERC-1155 de l'user + crédits retirés + tokens governance |
 
 ---
 
@@ -175,8 +181,7 @@ Les 3 seules fonctions server-side du projet. Elles vivent dans le code Next.js 
 
 | Store | State |
 |---|---|
-| `useMarketStore` | Listings chargés, filtres actifs, tri |
-| `usePredictionStore` | Prédictions chargées, filtre (actif/résolu) |
+| `useMarketStore` | Listings chargés, filtres actifs, tri, query de recherche |
 
 Le reste du state vient directement des hooks wagmi (données on-chain) — pas besoin de store supplémentaire.
 
@@ -192,9 +197,9 @@ Le reste du state vient directement des hooks wagmi (données on-chain) — pas 
 | Impact score (détaillé, breakdown) | Claude API (live) | Server Action `generateImpactScore` |
 | Listings marketplace | Smart contract Marketplace | `useMarketplace()` → `readContract` |
 | Prix d'un crédit | Smart contract Marketplace (listing.pricePerUnit) | `readContract` |
-| Prédictions | Smart contract PredictionPool | `usePredictions()` → `readContract` |
-| Odds YES/NO | Smart contract PredictionPool | `readContract` → `getOdds()` |
 | Proposals governance | Smart contract EcoForgeGovernance | `useProposals()` → `readContract` |
+| Voting power | Smart contract EcoForgeToken (ERC-20) | `useGovernanceToken()` → `balanceOf()` |
+| Milestone progression | Smart contract EcoForgeToken | `useMilestoneProgress()` → `getUserProgress()` |
 | Balances user (portfolio) | Smart contract CarbonCredit (ERC-1155) | `balanceOfBatch()` |
 | Trend forecast | Claude API (live) | Server Action `generateTrendForecast` |
 | AVAX/USD prix | Chainlink price feed (on-chain) | `readContract` sur le feed Chainlink |
@@ -244,17 +249,17 @@ Le reste du state vient directement des hooks wagmi (données on-chain) — pas 
 ```
 Landing → Connect Wallet → Dashboard
                               │
-              ┌───────────────┼───────────────┐──────────────┐
-              ▼               ▼               ▼              ▼
-         Marketplace     Predictions     Governance      Create
-              │               │               │              │
-              ▼               ▼               ▼              ▼
-         Buy/Sell        Stake AVAX       Vote/Dispute   Tokenize
-         Credits         YES/NO           Proposals      New Credit
-              │               │               │              │
-              └───────────────┼───────────────┘              │
-                              ▼                              │
-                          Portfolio ◄─────────────────────────┘
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+         Marketplace     Governance       Create
+              │               │               │
+              ▼               ▼               ▼
+         Search/Buy      Vote/Dispute    Tokenize
+         Sell/Challenge   Proposals      New Credit
+              │               │               │
+              └───────────────┼───────────────┘
+                              ▼
+                          Portfolio
 ```
 
 ---
@@ -274,10 +279,7 @@ src/
 │   │       └── page.tsx
 │   ├── create/
 │   │   └── page.tsx
-│   ├── predictions/
-│   │   ├── page.tsx
-│   │   └── [predictionId]/
-│   │       └── page.tsx
+│   # predictions/ — V2, not in MVP
 │   ├── governance/
 │   │   ├── page.tsx
 │   │   ├── [proposalId]/
@@ -302,22 +304,25 @@ src/
 │   │   ├── ImpactScoreBadge.tsx
 │   │   ├── TradePanel.tsx
 │   │   ├── RetireButton.tsx
+│   │   ├── ChallengeButton.tsx
+│   │   ├── SearchBar.tsx
 │   │   └── CreditFilters.tsx
 │   ├── ai/
 │   │   ├── ImpactScorePanel.tsx
 │   │   ├── TrendForecastPanel.tsx
 │   │   ├── AIInsightCard.tsx
 │   │   └── AnalyzeButton.tsx
-│   ├── predictions/
-│   │   ├── PredictionCard.tsx
-│   │   ├── StakePanel.tsx
-│   │   ├── OddsBar.tsx
-│   │   └── ClaimButton.tsx
+│   # predictions/ — V2, not in MVP
 │   ├── governance/
 │   │   ├── ProposalCard.tsx
 │   │   ├── VotePanel.tsx
 │   │   ├── DisputeForm.tsx
 │   │   └── DisputeCard.tsx
+│   ├── rewards/
+│   │   ├── MilestoneProgress.tsx
+│   │   ├── MilestoneList.tsx
+│   │   ├── TokenBalance.tsx
+│   │   └── RewardToast.tsx
 │   ├── charts/
 │   │   ├── PriceChart.tsx
 │   │   ├── ScoreHistoryChart.tsx
@@ -334,12 +339,12 @@ src/
 │   ├── useBuyCredit.ts
 │   ├── useListCredit.ts
 │   ├── useRetireCredit.ts
-│   ├── usePredictions.ts
-│   ├── useStake.ts
-│   ├── useClaim.ts
+│   ├── useSearchCredits.ts
 │   ├── useProposals.ts
 │   ├── useVote.ts
 │   ├── useDispute.ts
+│   ├── useGovernanceToken.ts
+│   ├── useMilestoneProgress.ts
 │   └── useUserPortfolio.ts
 ├── actions/
 │   ├── generateImpactScore.ts          # "use server" — Claude Vision + texte
@@ -352,8 +357,7 @@ src/
 │   └── ipfs/
 │       └── lighthouse.ts               # Upload/fetch via Lighthouse SDK
 ├── stores/
-│   ├── useMarketStore.ts
-│   └── usePredictionStore.ts
+│   └── useMarketStore.ts
 ├── types/
 │   ├── contracts.ts                    # Types générés depuis les ABIs Foundry
 │   ├── ai.ts                           # Types des réponses Claude

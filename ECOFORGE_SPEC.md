@@ -327,21 +327,149 @@ Contract: EcoForgeGovernance
 │         string reason
 │         DisputeStatus status     // Open, Resolved, Rejected
 │     }
-├── Token: EcoForge Governance Token (ERC-20) or vote-weight by staked AVAX
+├── Token: EcoForgeToken (ERC-20) — see 6.4b
 ├── Functions:
-│   ├── propose(type, description, calldata) → minStakeRequired
-│   ├── vote(proposalId, support) → public
+│   ├── propose(type, description, calldata) → minTokenBalance required
+│   ├── vote(proposalId, support) → public, weight = token balance
 │   ├── execute(proposalId) → quorumReached + deadline passed
-│   ├── disputeCredit(creditId, reason) → public
-│   └── resolveDispute(disputeId, resolution) → onlyGovernance
+│   ├── disputeCredit(creditId, reason) → public // auto-creates a DisputeResolution proposal
+│   └── resolveDispute(disputeId, resolution) → onlyGovernance // called by execute()
+├── Constants:
+│   ├── VOTING_PERIOD: 7 days
+│   ├── QUORUM_PERCENTAGE: 10% of total supply
+│   └── MIN_PROPOSAL_TOKENS: minimum tokens to create a proposal
 └── Events:
     ├── ProposalCreated(id, proposer, type)
     ├── Voted(proposalId, voter, support, weight)
     ├── ProposalExecuted(id)
-    └── DisputeRaised(creditId, challenger)
+    └── DisputeRaised(creditId, challenger, autoProposalId)
 ```
 
-### 6.4 PredictionPool.sol — Gamified Predictions
+### 6.4b EcoForgeToken.sol — Governance Token
+
+ERC-20 token used for voting power in the DAO. Earned through milestone-based activity rewards.
+
+```
+Contract: EcoForgeToken (ERC-20)
+├── Inherits: ERC20, AccessControl
+├── Roles: MINTER_ROLE (held by CarbonCredit, Marketplace, Governance contracts + admin)
+├── Structs:
+│   └── Milestone {
+│         uint256 actionsRequired      // cumulative actions needed
+│         uint256 tokensRewarded       // tokens minted at this milestone
+│     }
+├── State:
+│   ├── milestones: Milestone[]        // hardcoded tiers (Option A)
+│   ├── userActions: address => uint256  // cumulative action count per wallet
+│   ├── userMilestone: address => uint256 // last milestone reached per wallet
+│   └── dailyActionCap: uint256        // max actions counted per wallet per day (anti-sybil)
+├── Functions:
+│   ├── recordAction(user) → onlyRole(MINTER_ROLE)
+│   │     // Called by other contracts on each qualifying action
+│   │     // Increments userActions[user]
+│   │     // If new milestone reached → auto-mint tokens to user
+│   ├── burn(user, amount) → onlyRole(MINTER_ROLE) // for punishments
+│   ├── burnAll(user) → onlyRole(MINTER_ROLE) // burn entire balance (fraud penalty)
+│   ├── getMilestones() → view
+│   ├── getUserProgress(user) → view // returns { actions, currentMilestone, nextMilestone, tokensEarned }
+│   └── transfer/transferFrom → DISABLED (non-transferable, soulbound)
+├── Milestone Tiers (hardcoded, adjustable before deploy):
+│   ├── Tier 1:   5 actions  → 1 token   (total: 1)
+│   ├── Tier 2:  15 actions  → 2 tokens  (total: 3)
+│   ├── Tier 3:  30 actions  → 3 tokens  (total: 6)
+│   ├── Tier 4:  50 actions  → 5 tokens  (total: 11)
+│   ├── Tier 5: 100 actions  → 8 tokens  (total: 19)
+│   ├── Tier 6: 200 actions  → 13 tokens (total: 32)
+│   └── Tier 7: 500 actions  → 21 tokens (total: 53)
+├── Qualifying actions (each = +1 to counter):
+│   ├── Create a credit (Certified or Community)
+│   ├── Buy a credit
+│   ├── Sell a credit
+│   ├── Retire (burn) a credit
+│   ├── Vote on a proposal
+│   └── Submit a dispute that gets accepted
+├── Anti-sybil:
+│   ├── Max actions counted per wallet per day (e.g., 10)
+│   ├── Non-transferable tokens → can't consolidate across wallets
+│   └── Actions cost gas → makes mass wallet creation expensive
+└── Events:
+    ├── ActionRecorded(user, totalActions)
+    ├── MilestoneReached(user, milestoneIndex, tokensRewarded)
+    ├── TokensBurned(user, amount, reason)
+    └── AllTokensBurned(user, reason)
+```
+
+### 6.4c Punishment System
+
+Anti-fraud and anti-spam mechanisms across all contracts.
+
+```
+CASE 1: Fraudulent credit detected (via DAO dispute vote)
+─────────────────────────────────────────────────────────
+Trigger: Dispute vote passes (FOR wins)
+Actions:
+  1. CarbonCredit.updateStatus(creditId, Suspended) — credit no longer tradeable
+  2. EcoForgeToken.burnAll(issuer) — issuer loses ALL governance tokens
+  3. CarbonCredit.blacklist(issuer) — issuer can never create credits again
+Executed automatically by EcoForgeGovernance.execute()
+
+CASE 2: False dispute (spam/malicious challenge)
+─────────────────────────────────────────────────
+Trigger: Dispute vote fails (AGAINST wins)
+Prerequisite: Challenger must stake governance tokens to submit a dispute
+Actions:
+  1. Staked tokens are burned (EcoForgeToken.burn(challenger, stakeAmount))
+  2. Dispute status set to Rejected
+  3. Credit returns to normal status
+
+CASE 3: Successful dispute (legitimate challenge)
+─────────────────────────────────────────────────
+Trigger: Dispute vote passes (FOR wins)
+Actions:
+  1. Staked tokens are returned to challenger
+  2. Challenger receives bonus tokens (reward for protecting the platform)
+  3. Fraudulent issuer is punished (see Case 1)
+
+DISPUTE STAKE AMOUNT:
+  - Must stake minimum DISPUTE_STAKE_AMOUNT governance tokens to submit dispute
+  - If you don't have enough tokens → can't dispute (prevents spam from new accounts)
+  - Staked tokens are locked until the vote resolves
+```
+
+Additions to existing contracts for punishment support:
+
+```
+CarbonCredit.sol — additions:
+├── Mappings:
+│   └── blacklisted: address => bool
+├── Functions:
+│   ├── blacklist(address) → onlyRole(ADMIN_ROLE) or onlyGovernance
+│   └── isBlacklisted(address) → view
+├── Modifiers:
+│   └── notBlacklisted(msg.sender) on createCertifiedCredit + createCommunityCredit
+└── Events:
+    └── IssuerBlacklisted(address, creditId)
+
+EcoForgeGovernance.sol — additions:
+├── State:
+│   └── disputeStakes: disputeId => { challenger, amount, returned }
+├── Constants:
+│   └── DISPUTE_STAKE_AMOUNT: minimum tokens to stake for a dispute
+├── Functions (updated):
+│   ├── disputeCredit(creditId, reason) → requires staking DISPUTE_STAKE_AMOUNT tokens
+│   └── resolveDispute() → now also handles stake return/burn + issuer punishment
+└── Events:
+    ├── DisputeStaked(disputeId, challenger, amount)
+    ├── DisputeStakeReturned(disputeId, challenger, amount)
+    └── DisputeStakeBurned(disputeId, challenger, amount)
+```
+
+### ~~6.4 PredictionPool.sol — Gamified Predictions~~ [V2 — NOT IN MVP]
+
+> **Moved to V2.** Do not implement until explicitly specified. The prediction market adds complexity (extra contract, Chainlink resolution, dedicated UI) for limited value at launch with a small user base. Focus MVP on Marketplace + Create + AI + Governance.
+
+<details>
+<summary>V2 spec (click to expand)</summary>
 
 Users stake AVAX on carbon credit value predictions.
 
@@ -372,6 +500,8 @@ Contract: PredictionPool
     ├── Resolved(predictionId, outcome)
     └── Claimed(predictionId, user, amount)
 ```
+
+</details>
 
 ### 6.5 Contract Inheritance & Dependencies
 
@@ -738,40 +868,63 @@ Governance is **intentionally narrow** for MVP:
 1. **Credit Eligibility Criteria** — Define which project types qualify, minimum standards.
 2. **Dispute Resolution** — Community votes on challenged credits.
 
-### 11.2 Governance Flow
+### 11.2 Governance Token (EcoForgeToken)
 
-```
-1. Proposer stakes minimum tokens → creates proposal
-2. 7-day voting period → token-weighted votes
-3. If quorum reached + majority FOR → proposal executes
-4. Executed proposals update contract parameters on-chain
-```
-
-### 11.3 Voting Power
-
-- Based on governance token holdings (minted via staking AVAX or earned through platform activity)
+- ERC-20, **non-transferable** in MVP (prevents vote buying)
+- Earned through **milestone-based activity rewards** (see 6.4b):
+  - Actions counted: create, buy, sell, retire, vote, successful dispute
+  - Tokens minted automatically when a milestone tier is reached (5 actions → 1 token, 15 → 2, etc.)
+  - Daily action cap per wallet (anti-sybil)
 - 1 token = 1 vote
-- Delegation supported
+- Minimum balance required to create a proposal (anti-spam)
+- **Tokens can be burned as punishment** (see 6.4c)
+
+### 11.3 Proposal Flow
+
+```
+1. User holds minimum governance tokens
+2. Creates proposal (type: CreditEligibility or DisputeResolution)
+3. 7-day voting period — token-weighted votes (FOR / AGAINST)
+4. After deadline:
+   - Quorum reached (10%+ of supply voted) + majority FOR → executable
+   - Quorum not reached → expired
+   - Majority AGAINST → rejected
+5. Anyone can call execute() → on-chain action runs automatically
+```
+
+### 11.4 Dispute Flow (with stake-to-dispute)
+
+```
+1. User clicks "Challenge" on any credit (from marketplace or credit detail page)
+2. Writes reason for the challenge
+3. Must stake DISPUTE_STAKE_AMOUNT governance tokens (skin in the game)
+   - If not enough tokens → can't dispute (prevents spam from new accounts)
+4. Tx: disputeCredit(creditId, reason) — locks staked tokens
+5. Contract auto-creates a DisputeResolution proposal
+6. Credit is marked "Disputed" on-chain (still visible, flagged in UI)
+7. Community votes FOR (= fraudulent, suspend) or AGAINST (= legit, dismiss)
+8. Optional: anyone can click "Analyze with AI" to get Claude's assessment
+9. After vote resolves:
+   - FOR wins (credit is fraudulent):
+     → Credit status set to Suspended, no longer tradeable
+     → Challenger gets staked tokens back + bonus reward
+     → Fraudulent issuer: ALL tokens burned + address blacklisted
+   - AGAINST wins (credit is legit):
+     → Dispute rejected, credit returns to normal
+     → Challenger's staked tokens are BURNED (punishment for false dispute)
+```
+
+### 11.5 Voting Power
+
+- Voting power = EcoForgeToken balance at time of vote
+- 1 token = 1 vote
+- No delegation in MVP (V2 feature)
 
 ---
 
-## 12. Gamified Prediction Layer
+## ~~12. Gamified Prediction Layer~~ [V2 — NOT IN MVP]
 
-### 12.1 Flow
-
-```
-1. Platform (or DAO) creates prediction: "Will EUA price exceed €100 by Q3 2026?"
-2. Users stake AVAX on YES or NO
-3. Odds update dynamically based on pool ratios
-4. At resolution time, Chainlink oracle resolves outcome
-5. Winners split the losing pool (minus platform fee)
-```
-
-### 12.2 Reward Calculation
-
-```
-winnerPayout = userStake + (userStake / totalWinnerStake) * totalLoserStake * (1 - fee)
-```
+> **Moved to V2.** See section 6.4 for the full spec. Not implemented in MVP.
 
 ---
 
@@ -852,7 +1005,7 @@ ecoforge/
 │   ├── CarbonCredit.sol
 │   ├── Marketplace.sol
 │   ├── EcoForgeGovernance.sol
-│   ├── PredictionPool.sol
+│   ├── EcoForgeToken.sol           # Governance ERC-20 (non-transferable MVP)
 │   ├── EcoForgeOracle.sol
 │   └── interfaces/
 │       ├── ICarbonCredit.sol
@@ -861,7 +1014,7 @@ ecoforge/
 │   ├── CarbonCredit.t.sol
 │   ├── Marketplace.t.sol
 │   ├── Governance.t.sol
-│   └── PredictionPool.t.sol
+│   └── EcoForgeToken.t.sol
 ├── script/                         # Foundry deployment scripts (Solidity)
 │   ├── Deploy.s.sol
 │   └── Seed.s.sol                  # Seed testnet data
@@ -924,12 +1077,10 @@ ecoforge/
 - [ ] Write `CarbonCredit.sol` (ERC-1155)
 - [ ] Write `Marketplace.sol`
 - [ ] Basic contract tests
-- [ ] Set up Prisma + database
 
 ### Day 2 — Smart Contracts Complete
 
-- [ ] Write `EcoForgeGovernance.sol`
-- [ ] Write `PredictionPool.sol`
+- [ ] Write `EcoForgeGovernance.sol` + `EcoForgeToken.sol`
 - [ ] Write `EcoForgeOracle.sol` (Chainlink integration stub)
 - [ ] Full contract test suite
 - [ ] Deploy to Fuji Testnet
@@ -953,8 +1104,7 @@ ecoforge/
 ### Day 5 — Frontend Features
 
 - [ ] Create/tokenize credit flow
-- [ ] Prediction market UI + staking
-- [ ] Governance page (proposals + voting)
+- [ ] Governance page (proposals + voting + disputes)
 - [ ] Portfolio page
 - [ ] Charts and data visualization
 
@@ -1053,8 +1203,8 @@ vercel --prod
 | Oracle manipulation | Multi-source validation, confidence thresholds, DAO challenge mechanism |
 | AI hallucination | Structured output parsing, confidence scores, human review for low-confidence results |
 | Private key exposure | Never store in code; use `.env.local` + hardware wallet for mainnet |
-| Front-running | Consider commit-reveal for prediction staking |
-| Flash loan attacks | Time-lock on large operations, minimum stake duration |
+| Front-running | Consider commit-reveal for future prediction staking (V2) |
+| Flash loan attacks | Time-lock on large operations |
 | API key leakage | All AI calls server-side only; never expose Anthropic key to client |
 
 ---
@@ -1063,6 +1213,7 @@ vercel --prod
 
 | Feature | Description | Priority |
 |---------|-------------|----------|
+| Prediction Market | Gamified staking on carbon credit value predictions (see 6.4 V2 spec) | High |
 | Avalanche Subnet | Dedicated subnet for high-volume trading | High |
 | Custom ML Models | Train specialized models on carbon market data | Medium |
 | Mobile App | React Native companion app | Medium |
