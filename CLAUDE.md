@@ -20,8 +20,9 @@ Chainlink Functions → Smart Contracts (push AI scores on-chain)
 - **Blockchain:** Avalanche C-Chain, Fuji Testnet (chainId 43113), Solidity ^0.8.20
 - **Smart Contract Framework:** Foundry (forge, cast, anvil) — NOT Hardhat
 - **Frontend:** Next.js 14+ (App Router), TypeScript, Tailwind CSS
+- **Package Manager:** pnpm
 - **Web3:** wagmi v2 + viem, RainbowKit
-- **AI:** Anthropic Claude API (Sonnet 4.6) via Server Actions only
+- **AI:** Anthropic Claude API (Sonnet 4.6) via Server Actions only — **mocked for now** (SDK not installed yet)
 - **IPFS:** Lighthouse (permanent storage via Filecoin) — NOT Pinata
 - **Oracle:** Chainlink Functions (serverless)
 - **State:** Zustand (1 store: useMarketStore)
@@ -93,8 +94,10 @@ The Anthropic API key is NEVER exposed client-side.
 - No REST API — only Server Actions
 - No database — all state is on-chain or IPFS
 - Foundry for contracts: `forge build`, `forge test`, `forge script`
-- Contract sources in `src/contracts/`, tests in `test/`, deploy scripts in `script/`
+- Foundry config: set `src = "contracts"` in foundry.toml to avoid conflict with Next.js `src/`
 - Frontend sources in `src/` (Next.js app directory)
+- No unnecessary comments in code — explain in conversation, keep code clean
+- Git: frontend work on `frontend` branch, smart contracts on separate branch
 
 ## Spec Files
 
@@ -104,14 +107,15 @@ The Anthropic API key is NEVER exposed client-side.
 ## Environment Variables Required
 
 ```
-ANTHROPIC_API_KEY          # Claude API (server-side only)
-LIGHTHOUSE_API_KEY         # IPFS uploads
-FUJI_RPC_URL               # Avalanche Fuji testnet
-SNOWTRACE_API_KEY          # Contract verification
-DEPLOYER_PRIVATE_KEY       # Contract deployment (never commit)
-NEXT_PUBLIC_CHAIN_ID=43113 # Fuji
-NEXT_PUBLIC_AVALANCHE_RPC  # Public RPC for frontend
-NEXT_PUBLIC_*_ADDRESS      # Deployed contract addresses
+ANTHROPIC_API_KEY              # Claude API (server-side only) — not used yet (mocked)
+LIGHTHOUSE_API_KEY             # IPFS uploads
+NEXT_PUBLIC_WALLETCONNECT_ID   # WalletConnect project ID (free at cloud.walletconnect.com)
+FUJI_RPC_URL                   # Avalanche Fuji testnet
+SNOWTRACE_API_KEY              # Contract verification
+DEPLOYER_PRIVATE_KEY           # Contract deployment (never commit)
+NEXT_PUBLIC_CHAIN_ID=43113     # Fuji
+NEXT_PUBLIC_AVALANCHE_RPC      # Public RPC for frontend
+NEXT_PUBLIC_*_ADDRESS          # Deployed contract addresses
 ```
 
 ## What NOT to do
