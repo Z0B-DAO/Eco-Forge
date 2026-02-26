@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Foundry
+out/
+cache/
+broadcast/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+
+# Debug
+npm-debug.log*
+
+# Private keys / secrets
+*.pem

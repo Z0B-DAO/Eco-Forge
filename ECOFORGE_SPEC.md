@@ -80,13 +80,24 @@ Credits that already exist on traditional registries (Verra, Gold Standard).
 Flow:
 1. Issuer owns a verified credit on Verra/Gold Standard
 2. Issuer retires (cancels) the credit on the registry — this is public and verifiable
-3. Issuer submits retirement proof on EcoForge (serial number, certificate, registry link)
-4. AI + admin verify the retirement proof
-5. Only after verification → mint is authorized on-chain
-6. Token is labeled "Certified" with registry source stored in metadata
+3. Issuer submits on EcoForge:
+   - Retirement proof (serial number, certificate, registry link)
+   - Project data (name, type, region, vintage year, tonnes CO2e)
+   - Satellite image (optional but recommended)
+4. Contract checks: retirement proof NOT already used (anti-double-bridge)
+   - Mapping usedRetirementProofs[hash(registrySource + serialNumber)] must be false
+   - If already used → tx reverts, credit rejected
+5. AI verification (MANDATORY):
+   - Claude analyzes retirement proof + project data + satellite image
+   - Validates consistency (does the proof match the project description?)
+   - Generates impact score
+   - If AI confidence < threshold → credit minted as Pending (needs manual review)
+   - If AI confidence >= threshold → credit minted as Verified
+6. Retirement proof hash stored on-chain → can never be used again
+7. Token is labeled "Certified" with registry source stored in metadata
 ```
 
-The original credit is dead on the registry. The ERC-1155 token takes over. No double-counting possible.
+The original credit is dead on the registry. The hash is stored on-chain. **No one can bridge the same credit twice.**
 
 #### B. Community Verified Credits (native to EcoForge)
 
@@ -94,32 +105,64 @@ Credits from projects not registered on traditional registries. More accessible,
 
 ```
 Flow:
-1. Project owner submits directly on EcoForge (data, satellite images, documentation)
-2. AI (Claude Vision + text) analyzes and generates an impact score
+1. Project owner submits directly on EcoForge:
+   - Project data (name, type, region, vintage year, tonnes CO2e, methodology)
+   - Satellite image (MANDATORY)
+   - Documentation (PDF, links)
+2. AI verification (MANDATORY):
+   - Claude Vision analyzes satellite image + project data
+   - Generates impact score + breakdown + confidence
+   - Score stored in metadata
 3. Credit is minted with status "Pending" — NOT tradeable yet
 4. Community DAO reviews: 7-day challenge period
-5. If no successful challenge → status moves to "Community Verified" → tradeable
+5. If no successful challenge → status moves to "Verified" → tradeable
 6. Can be challenged at any time after via governance dispute system
 ```
+
+#### AI verification on BOTH paths
+
+Every credit that enters EcoForge goes through Claude analysis. No exceptions.
+
+| | Certified | Community |
+|---|---|---|
+| AI analyzes | Retirement proof + project data + image | Project data + satellite image + documentation |
+| AI checks for | Proof/data consistency, image authenticity | Project legitimacy, image authenticity, additionality |
+| AI generates | Impact score + confidence | Impact score + breakdown + confidence |
+| Low confidence result | Minted as Pending (manual review) | Minted as Pending (DAO challenge) |
+| High confidence result | Minted as Verified | Still Pending (always needs DAO period) |
+
+#### Anti-double-bridge (Certified only)
+
+```
+On-chain check:
+  hash = keccak256(registrySource + serialNumber)
+  require(usedRetirementProofs[hash] == false, "Already bridged")
+  usedRetirementProofs[hash] = true
+```
+
+Even if someone retires the same credit on Verra twice (shouldn't be possible but just in case), or tries to submit the same proof with a different wallet, the contract rejects it.
 
 #### Comparison
 
 | | Certified | Community Verified |
 |---|---|---|
 | Source | Verra, Gold Standard, etc. | Direct submission |
-| Verification | Registry retirement proof + AI | AI + DAO community review |
-| Trust level | High (backed by existing certification) | Medium (backed by AI + community) |
+| AI verification | Mandatory (proof + data consistency) | Mandatory (image + data analysis) |
+| DAO challenge period | Only if AI confidence low | Always (7 days) |
+| Anti-double-bridge | Yes (`usedRetirementProofs` on-chain) | N/A (no external registry) |
+| Trust level | High (registry + AI + on-chain proof) | Medium (AI + DAO community) |
 | Label on-chain | `CreditOrigin.Certified` | `CreditOrigin.CommunityVerified` |
 | Barrier to entry | High (need existing certification) | Low (open to anyone) |
-| Price expectation | Higher (trusted) | Lower (less established) |
+| Price expectation | Higher (multi-layer trust) | Lower (less established) |
 
 #### What we guarantee vs. what we don't
 
 | | Guaranteed | Not guaranteed |
 |---|---|---|
 | Double-counting on-chain | Impossible (ERC-1155) | — |
-| Double-counting cross-platform | Yes, via retirement-then-mint (Certified) | Not 100% if source registry is opaque |
-| Credit quality | AI + DAO reduce risk | Not infallible — well-crafted fraud can pass |
+| Double-bridging same credit | Impossible (`usedRetirementProofs` hash check) | — |
+| AI analysis on every credit | Yes, mandatory for both types | — |
+| Credit quality | AI + DAO + anti-double-bridge reduce risk | Not infallible — well-crafted fraud can pass |
 | Real environmental impact | Full transparency of data | We don't plant the trees ourselves |
 
 ---
@@ -129,13 +172,12 @@ Flow:
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        FRONTEND (Next.js)                          │
-│  Dashboard │ Marketplace │ Predictions │ Governance │ Portfolio    │
+│  Dashboard │ Marketplace │ Governance │ Create │ Portfolio         │
 └──────────────────────────────┬──────────────────────────────────────┘
                                │
                     ┌──────────▼──────────┐
-                    │   Backend API Layer  │
-                    │     (Next.js API     │
-                    │    Routes / Node)    │
+                    │  Server Actions      │
+                    │  ("use server")      │
                     └───┬─────────────┬───┘
                         │             │
            ┌────────────▼──┐   ┌──────▼────────────┐
@@ -143,18 +185,17 @@ Flow:
            │  (Anthropic)   │   │  Smart Contracts   │
            │                │   │                    │
            │ - Impact Score │   │ - CarbonCredit1155 │
-           │ - Trend Pred.  │   │ - Marketplace      │
-           │ - Data Parsing │   │ - Governance DAO   │
-           └────────────────┘   │ - Prediction Pool  │
-                                │ - Staking          │
+           │ - Dispute      │   │ - Marketplace      │
+           │   Analysis     │   │ - Governance DAO   │
+           └────────────────┘   │ - EcoForgeToken    │
+                                │ - Oracle           │
                                 └────────┬───────────┘
                                          │
                               ┌──────────▼──────────┐
-                              │  Chainlink Oracles   │
+                              │  Chainlink Functions  │
                               │                      │
-                              │ - Satellite data feed │
-                              │ - Carbon price feed   │
-                              │ - External API data   │
+                              │ - AVAX/USD price feed │
+                              │ - AI score on-chain   │
                               └──────────────────────┘
 ```
 
@@ -177,8 +218,8 @@ Flow:
 | Component | Technology |
 |-----------|------------|
 | AI Provider | **Anthropic Claude API (claude-sonnet-4-6)** |
-| Purpose | Impact scoring, trend analysis, data parsing |
-| Integration | REST API via backend (server-side only) |
+| Purpose | Impact scoring (Vision + text), dispute analysis |
+| Integration | Next.js Server Actions (server-side only) |
 
 > **AI Decision: Claude API vs Custom ML Model**
 >
@@ -207,20 +248,19 @@ Flow:
 | Charts | Recharts or Lightweight Charts |
 | Wallet Connect | RainbowKit or Web3Modal |
 
-### Backend (API Routes)
+### Server-side (Next.js Server Actions only)
 | Component | Technology |
 |-----------|------------|
-| Runtime | Next.js API Routes (Edge/Node) |
-| Database | PostgreSQL (via Prisma ORM) — for caching AI scores + metadata |
-| Queue | Bull (Redis) — for async AI processing jobs |
+| Runtime | Next.js Server Actions (`"use server"`) |
+| AI calls | Anthropic SDK (server-side only, API key never exposed) |
+| No database | All state lives on-chain or IPFS |
+| No queue | AI calls are synchronous (~2-5s) |
 
 ### Infrastructure
 | Component | Technology |
 |-----------|------------|
-| Hosting | Vercel (frontend + API) |
-| Database | Supabase PostgreSQL or Neon |
-| Cache/Queue | Upstash Redis |
-| IPFS | Pinata (for credit metadata + satellite images) |
+| Hosting | Vercel (frontend + server actions) |
+| IPFS | Lighthouse (permanent storage via Filecoin) |
 
 ---
 
@@ -243,6 +283,7 @@ Contract: CarbonCredit (ERC-1155)
 │         string projectType        // "reforestation", "renewable", "methane_capture"
 │         string region
 │         uint256 vintageYear
+│         uint256 tonnesCO2e        // tonnes of CO2 equivalent (for portfolio totals)
 │         uint256 totalSupply
 │         uint256 impactScore       // 0-100, set by AI via oracle
 │         string metadataURI        // IPFS link
@@ -254,22 +295,36 @@ Contract: CarbonCredit (ERC-1155)
 │     }
 ├── Mappings:
 │   ├── creditTypes: id => CreditType
-│   └── retiredCredits: address => id => amount
+│   ├── retiredCredits: address => id => amount
+│   ├── usedRetirementProofs: bytes32 => bool  // hash(registrySource+serial) → prevents double-bridge
+│   └── blacklisted: address => bool            // fraudulent issuers
 ├── Functions:
-│   ├── createCertifiedCredit(params, registrySource, retirementProof) → onlyRole(MINTER_ROLE)
-│   ├── createCommunityCredit(params) → public // anyone can submit, minted as Pending
+│   ├── createCertifiedCredit(params, registrySource, retirementProof)
+│   │     → onlyRole(MINTER_ROLE), notBlacklisted
+│   │     → reverts if retirement proof hash already used
+│   │     → stores hash in usedRetirementProofs
+│   │     → status = Verified (if AI confidence high) or Pending (if low)
+│   ├── createCommunityCredit(params)
+│   │     → public, notBlacklisted
+│   │     → always minted as Pending
 │   ├── verifyCommunityCredit(id) → onlyRole(VERIFIER_ROLE) // after DAO challenge period
 │   ├── mintCredits(id, to, amount) → onlyRole(MINTER_ROLE)
 │   ├── updateImpactScore(id, score) → onlyRole(VERIFIER_ROLE) // called by oracle
 │   ├── retireCredits(id, amount) → public // burn mechanism
+│   ├── blacklist(address) → onlyRole(ADMIN_ROLE) or onlyGovernance
+│   ├── isBlacklisted(address) → view
+│   ├── isRetirementProofUsed(bytes32 hash) → view
 │   ├── getCreditType(id) → view
 │   └── uri(id) → override // returns IPFS metadata
-└── Events:
-    ├── CertifiedCreditCreated(id, projectName, registrySource, retirementProof)
-    ├── CommunityCreditSubmitted(id, projectName, issuer)
-    ├── CommunityCreditVerified(id)
-    ├── ImpactScoreUpdated(id, oldScore, newScore)
-    └── CreditsRetired(owner, id, amount)
+├── Modifiers:
+│   └── notBlacklisted(msg.sender) → on createCertifiedCredit + createCommunityCredit
+└── Events (all indexed for frontend event filtering):
+    ├── CertifiedCreditCreated(uint256 indexed id, string projectName, string registrySource, bytes32 proofHash)
+    ├── CommunityCreditSubmitted(uint256 indexed id, string projectName, address indexed issuer)
+    ├── CommunityCreditVerified(uint256 indexed id)
+    ├── ImpactScoreUpdated(uint256 indexed id, uint256 oldScore, uint256 newScore)
+    ├── CreditsRetired(address indexed owner, uint256 indexed creditId, uint256 amount)
+    └── IssuerBlacklisted(address indexed issuer, uint256 creditId)
 ```
 
 ### 6.2 Marketplace.sol — Trading Engine
@@ -289,18 +344,20 @@ Contract: Marketplace
 │     }
 ├── State:
 │   ├── listings: listingId => Listing
+│   ├── lastSoldPrice: creditId => uint256  // updated on each sale (for portfolio valuation)
 │   ├── platformFee: uint256 (basis points, e.g., 250 = 2.5%)
 │   └── feeRecipient: address (DAO treasury)
 ├── Functions:
 │   ├── listCredits(creditId, amount, pricePerUnit) → public
-│   ├── buyCredits(listingId, amount) → payable
+│   ├── buyCredits(listingId, amount) → payable // also updates lastSoldPrice
 │   ├── cancelListing(listingId) → onlySeller
 │   ├── updatePrice(listingId, newPrice) → onlySeller
+│   ├── getLastSoldPrice(creditId) → view
 │   └── withdrawFees() → onlyFeeRecipient
-└── Events:
-    ├── Listed(listingId, creditId, seller, amount, price)
-    ├── Sold(listingId, buyer, amount, totalPrice)
-    └── ListingCancelled(listingId)
+└── Events (all indexed for frontend event filtering):
+    ├── Listed(uint256 indexed listingId, uint256 indexed creditId, address indexed seller, uint256 amount, uint256 price)
+    ├── Sold(uint256 indexed listingId, address indexed buyer, uint256 indexed creditId, uint256 amount, uint256 totalPrice)
+    └── ListingCancelled(uint256 indexed listingId)
 ```
 
 ### 6.3 EcoForgeGovernance.sol — DAO
@@ -338,11 +395,11 @@ Contract: EcoForgeGovernance
 │   ├── VOTING_PERIOD: 7 days
 │   ├── QUORUM_PERCENTAGE: 10% of total supply
 │   └── MIN_PROPOSAL_TOKENS: minimum tokens to create a proposal
-└── Events:
-    ├── ProposalCreated(id, proposer, type)
-    ├── Voted(proposalId, voter, support, weight)
-    ├── ProposalExecuted(id)
-    └── DisputeRaised(creditId, challenger, autoProposalId)
+└── Events (all indexed for frontend event filtering):
+    ├── ProposalCreated(uint256 indexed id, address indexed proposer, ProposalType pType)
+    ├── Voted(uint256 indexed proposalId, address indexed voter, bool support, uint256 weight)
+    ├── ProposalExecuted(uint256 indexed id)
+    └── DisputeRaised(uint256 indexed creditId, address indexed challenger, uint256 indexed autoProposalId)
 ```
 
 ### 6.4b EcoForgeToken.sol — Governance Token
@@ -392,11 +449,11 @@ Contract: EcoForgeToken (ERC-20)
 │   ├── Max actions counted per wallet per day (e.g., 10)
 │   ├── Non-transferable tokens → can't consolidate across wallets
 │   └── Actions cost gas → makes mass wallet creation expensive
-└── Events:
-    ├── ActionRecorded(user, totalActions)
-    ├── MilestoneReached(user, milestoneIndex, tokensRewarded)
-    ├── TokensBurned(user, amount, reason)
-    └── AllTokensBurned(user, reason)
+└── Events (all indexed for frontend event filtering):
+    ├── ActionRecorded(address indexed user, uint256 totalActions)
+    ├── MilestoneReached(address indexed user, uint256 indexed milestoneIndex, uint256 tokensRewarded)
+    ├── TokensBurned(address indexed user, uint256 amount, string reason)
+    └── AllTokensBurned(address indexed user, string reason)
 ```
 
 ### 6.4c Punishment System
@@ -458,10 +515,10 @@ EcoForgeGovernance.sol — additions:
 ├── Functions (updated):
 │   ├── disputeCredit(creditId, reason) → requires staking DISPUTE_STAKE_AMOUNT tokens
 │   └── resolveDispute() → now also handles stake return/burn + issuer punishment
-└── Events:
-    ├── DisputeStaked(disputeId, challenger, amount)
-    ├── DisputeStakeReturned(disputeId, challenger, amount)
-    └── DisputeStakeBurned(disputeId, challenger, amount)
+└── Events (all indexed for frontend event filtering):
+    ├── DisputeStaked(uint256 indexed disputeId, address indexed challenger, uint256 amount)
+    ├── DisputeStakeReturned(uint256 indexed disputeId, address indexed challenger, uint256 amount)
+    └── DisputeStakeBurned(uint256 indexed disputeId, address indexed challenger, uint256 amount)
 ```
 
 ### ~~6.4 PredictionPool.sol — Gamified Predictions~~ [V2 — NOT IN MVP]
@@ -564,40 +621,42 @@ fuji = { key = "${SNOWTRACE_API_KEY}", url = "https://api-testnet.snowtrace.io/a
 
 ### 7.1 Architecture
 
-All AI processing happens **server-side** in Next.js API routes. The Claude API is never exposed to the client.
+All AI processing happens **server-side** in Next.js Server Actions (`"use server"`). The Claude API key is never exposed to the client.
 
 ```
 ┌──────────────────────────────────────────────────┐
-│                AI Service Layer                   │
+│           AI Service Layer (Server Actions)       │
 │                                                   │
-│  ┌─────────────┐  ┌─────────────┐  ┌──────────┐ │
-│  │ Impact Score │  │ Trend       │  │ Data     │ │
-│  │ Generator   │  │ Forecaster  │  │ Parser   │ │
-│  └──────┬──────┘  └──────┬──────┘  └────┬─────┘ │
-│         │                │               │       │
-│         └────────────────┼───────────────┘       │
-│                          │                       │
-│                ┌─────────▼─────────┐             │
-│                │   Claude API      │             │
-│                │   (Sonnet 4.6)    │             │
-│                └───────────────────┘             │
+│  ┌─────────────────┐       ┌───────────────────┐ │
+│  │  Impact Score    │       │  Dispute          │ │
+│  │  Generator       │       │  Analyzer         │ │
+│  │  (Vision + text) │       │  (text only)      │ │
+│  └────────┬─────────┘       └────────┬──────────┘ │
+│           │                          │            │
+│           └────────────┬─────────────┘            │
+│                        │                          │
+│              ┌─────────▼─────────┐                │
+│              │   Claude API      │                │
+│              │   (Sonnet 4.6)    │                │
+│              └───────────────────┘                │
 └──────────────────────────────────────────────────┘
 ```
 
 ### 7.2 AI Use Cases
 
-#### A. Impact Score Generation
+#### A. Impact Score Generation (used on BOTH credit types)
 
-**Input:** Project metadata + satellite imagery (via Chainlink oracle or direct upload)
-**Output:** Impact score (0-100) + detailed breakdown
+**Input:** Project metadata + satellite imagery + retirement proof (if Certified)
+**Output:** Impact score (0-100) + detailed breakdown + confidence
 
 ```
 Prompt Structure:
 - System: "You are an environmental impact assessor for carbon credits..."
 - User: {
-    projectData: { type, region, area, methodology },
-    satelliteImagery: [base64 images or descriptions],
-    historicalData: { previous scores, growth metrics }
+    projectData: { type, region, area, methodology, tonnesCO2e },
+    satelliteImagery: [base64 images],       // Vision capability
+    retirementProof: { serial, registry },   // Certified only
+    creditOrigin: "Certified" | "Community"
   }
 - Expected Output (structured JSON): {
     overallScore: 85,
@@ -607,55 +666,60 @@ Prompt Structure:
       leakage: 85,
       verification: 85
     },
+    proofConsistency: true,   // Certified only: does proof match project data?
     reasoning: "...",
     riskFactors: ["..."],
     confidence: 0.87
   }
 ```
 
-#### B. Trend Forecasting
+#### B. Dispute Analysis
 
-**Input:** Market signals, regulatory news, emissions data
-**Output:** Price trend prediction + confidence + reasoning
+**Input:** Dispute details + credit data + challenger's reason
+**Output:** Validity assessment + recommendation
 
 ```
 Prompt Structure:
-- System: "You are a carbon market analyst..."
+- System: "You are a carbon credit dispute analyst..."
 - User: {
-    currentPrice: 82.50,
-    recentNews: ["EU tightens emissions cap...", "COP31 announces..."],
-    historicalPrices: [...],
-    emissionsData: {...}
+    creditData: { name, type, region, origin, impactScore, metadata },
+    disputeReason: "The satellite imagery shows no tree cover...",
+    satelliteImagery: [base64 images]    // Vision if available
   }
 - Expected Output (structured JSON): {
-    prediction: "bullish",
-    priceTarget: { low: 78, mid: 92, high: 105 },
-    timeframe: "3 months",
-    confidence: 0.72,
-    keyDrivers: ["EU regulatory tightening", "..."],
-    risks: ["Policy reversal in..."]
+    validity: "likely_fraudulent" | "likely_legitimate" | "insufficient_data",
+    confidence: 0.78,
+    recommendation: "suspend" | "dismiss" | "needs_investigation",
+    reasoning: "...",
+    redFlags: ["..."],
+    supportingEvidence: ["..."]
   }
 ```
-
-#### C. Dispute Analysis
-
-**Input:** Dispute details + credit data
-**Output:** Validity assessment + recommendation
 
 ### 7.3 AI Service Implementation
 
+2 Server Actions only:
+
 ```typescript
-// services/ai/claude.ts
-interface AIService {
-  generateImpactScore(projectData: ProjectData): Promise<ImpactScore>;
-  forecastTrend(marketData: MarketData): Promise<TrendForecast>;
-  analyzeDispute(dispute: DisputeData): Promise<DisputeAnalysis>;
-  parseProjectDocument(document: string): Promise<ParsedProject>;
-}
+// actions/generateImpactScore.ts
+"use server"
+async function generateImpactScore(
+  projectData: ProjectData,
+  imageBase64?: string,
+  retirementProof?: RetirementProof
+): Promise<ImpactScore>
+
+// actions/analyzeDispute.ts
+"use server"
+async function analyzeDispute(
+  creditData: CreditData,
+  disputeReason: string,
+  imageBase64?: string
+): Promise<DisputeAnalysis>
 ```
 
-**Rate Limiting:** Max 50 requests/min per user, cached results for 1 hour.
-**Cost Estimate:** ~$0.01-0.05 per impact score, ~$0.02-0.08 per forecast.
+**Rate Limiting:** Max 50 requests/min per user.
+**Cost Estimate:** ~$0.01-0.05 per impact score, ~$0.01-0.03 per dispute analysis.
 
 ---
 
@@ -671,30 +735,28 @@ Chainlink serves as the bridge between off-chain data (AI scores, satellite data
 - AVAX/USD price feed (already available on Fuji)
 - Carbon credit reference prices (if available, otherwise custom feed)
 
-#### B. Custom External Adapter
+#### B. Chainlink Functions (serverless)
 
-A Chainlink node calls our backend API to fetch AI-generated impact scores and push them on-chain.
+Chainlink Functions runs custom JavaScript in a decentralized oracle network (DON). No backend needed.
 
 ```
 Flow:
-1. Backend generates impact score via Claude API
-2. Score stored in database with metadata
-3. Chainlink node triggers External Adapter
-4. Adapter calls our API endpoint: GET /api/oracle/impact-score/{creditId}
-5. Adapter returns score to Chainlink node
-6. Node submits tx to CarbonCredit.updateImpactScore(creditId, score)
+1. User or admin triggers score update for a credit
+2. Chainlink Functions executes JS code in the DON
+3. JS code calls our Server Action to generate AI impact score
+4. Score is returned to the DON
+5. DON submits tx to CarbonCredit.updateImpactScore(creditId, score)
 ```
 
 #### C. Oracle Contract
 
 ```
 Contract: EcoForgeOracle
-├── Inherits: ChainlinkClient
+├── Inherits: FunctionsClient (Chainlink Functions)
 ├── Functions:
-│   ├── requestImpactScore(creditId) → sends Chainlink request
-│   ├── fulfillImpactScore(requestId, creditId, score) → callback
-│   ├── requestPredictionResolution(predictionId) → for prediction market
-│   └── fulfillPredictionResolution(requestId, predictionId, outcome) → callback
+│   ├── requestImpactScore(creditId) → sends Chainlink Functions request
+│   ├── fulfillRequest(requestId, response, err) → callback, updates score on-chain
+│   └── setDonId(donId) → onlyAdmin
 └── Access: Only authorized contracts can make requests
 ```
 
@@ -717,15 +779,11 @@ app/
 ├── page.tsx                    # Landing page
 ├── layout.tsx                  # Root layout (wallet provider, theme)
 ├── dashboard/
-│   └── page.tsx                # User dashboard (portfolio, activity)
+│   └── page.tsx                # User dashboard (portfolio, milestones, activity)
 ├── marketplace/
-│   ├── page.tsx                # Browse & search credits
+│   ├── page.tsx                # Browse, search & filter credits
 │   └── [creditId]/
-│       └── page.tsx            # Credit detail (score, history, trade)
-├── predictions/
-│   ├── page.tsx                # Active prediction markets
-│   └── [predictionId]/
-│       └── page.tsx            # Prediction detail + staking
+│       └── page.tsx            # Credit detail (score, history, trade, challenge)
 ├── governance/
 │   ├── page.tsx                # Proposals list
 │   ├── [proposalId]/
@@ -733,61 +791,25 @@ app/
 │   └── disputes/
 │       └── page.tsx            # Active disputes
 ├── create/
-│   └── page.tsx                # Create/tokenize new credit (for issuers)
-├── portfolio/
-│   └── page.tsx                # User's credits, retired credits, P&L
-└── api/
-    ├── ai/
-    │   ├── impact-score/route.ts
-    │   ├── trend-forecast/route.ts
-    │   └── dispute-analysis/route.ts
-    ├── oracle/
-    │   └── impact-score/[creditId]/route.ts
-    ├── credits/
-    │   └── route.ts            # Credit metadata CRUD
-    └── predictions/
-        └── route.ts            # Prediction metadata
+│   └── page.tsx                # Create/tokenize new credit (Certified or Community)
+└── portfolio/
+    └── page.tsx                # User's credits, retired, trades, CO2 total
 ```
+
+No API routes, no `/api` directory. All server-side logic is in Server Actions (`actions/` directory).
 
 ### 9.2 Key UI Components
 
-```
-components/
-├── layout/
-│   ├── Header.tsx              # Nav + wallet connect
-│   ├── Footer.tsx
-│   └── Sidebar.tsx
-├── web3/
-│   ├── ConnectButton.tsx       # Wallet connection
-│   ├── NetworkSwitch.tsx       # Ensure Avalanche network
-│   └── TransactionStatus.tsx   # Tx pending/success/fail
-├── credits/
-│   ├── CreditCard.tsx          # Credit listing card
-│   ├── CreditDetail.tsx        # Full credit info
-│   ├── ImpactScoreBadge.tsx    # Visual score display
-│   ├── TradePanel.tsx          # Buy/sell interface
-│   └── RetireButton.tsx        # Burn credits
-├── predictions/
-│   ├── PredictionCard.tsx
-│   ├── StakePanel.tsx
-│   └── OddsChart.tsx
-├── governance/
-│   ├── ProposalCard.tsx
-│   ├── VotePanel.tsx
-│   └── DisputeForm.tsx
-├── ai/
-│   ├── ImpactScorePanel.tsx    # AI score display + breakdown
-│   ├── TrendForecast.tsx       # AI prediction display
-│   └── AIInsightCard.tsx       # General AI insight
-├── charts/
-│   ├── PriceChart.tsx
-│   ├── VolumeChart.tsx
-│   └── ScoreHistoryChart.tsx
-└── common/
-    ├── LoadingSpinner.tsx
-    ├── Modal.tsx
-    └── Toast.tsx
-```
+See `FRONTEND_SPEC.md` for the full component list. Summary:
+
+- **layout/** — Header, Footer, Sidebar
+- **web3/** — ConnectButton, NetworkGuard, TxStatus
+- **credits/** — CreditCard, CreditDetail, CreditOriginBadge, ImpactScoreBadge, TradePanel, RetireButton, ChallengeButton, SearchBar, CreditFilters
+- **ai/** — ImpactScorePanel, AIInsightCard, AnalyzeButton
+- **governance/** — ProposalCard, VotePanel, DisputeForm, DisputeCard
+- **rewards/** — MilestoneProgress, MilestoneList, TokenBalance, RewardToast
+- **charts/** — PriceChart, ScoreHistoryChart, VoteChart
+- **common/** — LoadingSpinner, Modal, Toast, EmptyState
 
 ### 9.3 Web3 Configuration
 
@@ -800,62 +822,46 @@ components/
 
 ---
 
-## 10. Backend API
+## 10. Data Architecture (No Backend)
 
-### 10.1 Database Schema (Prisma)
+There is **no database, no backend server, no API routes**. All data comes from two sources:
 
-```prisma
-model CreditProject {
-  id              String   @id @default(cuid())
-  onChainId       Int      @unique         // ERC-1155 token ID
-  name            String
-  type            String                    // reforestation, renewable, etc.
-  region          String
-  description     String
-  metadataURI     String                    // IPFS hash
-  issuer          String                    // wallet address
-  impactScores    ImpactScore[]
-  createdAt       DateTime @default(now())
-}
+### 10.1 On-chain data (Avalanche C-Chain)
 
-model ImpactScore {
-  id              String   @id @default(cuid())
-  creditId        String
-  credit          CreditProject @relation(fields: [creditId], references: [id])
-  overallScore    Int                       // 0-100
-  additionality   Int
-  permanence      Int
-  leakage         Int
-  verification    Int
-  reasoning       String
-  confidence      Float
-  rawResponse     Json                      // full Claude response
-  createdAt       DateTime @default(now())
-}
+Read via wagmi/viem `readContract` and `getLogs`:
 
-model TrendForecast {
-  id              String   @id @default(cuid())
-  creditType      String
-  prediction      String                    // bullish, bearish, neutral
-  priceTargetLow  Float
-  priceTargetMid  Float
-  priceTargetHigh Float
-  confidence      Float
-  keyDrivers      String[]
-  createdAt       DateTime @default(now())
-}
+| Data | Contract | How |
+|---|---|---|
+| Credit types & metadata URI | CarbonCredit | `getCreditType(id)` |
+| Impact scores | CarbonCredit | `creditTypes[id].impactScore` |
+| Tonnes CO2e | CarbonCredit | `creditTypes[id].tonnesCO2e` |
+| User credit balances | CarbonCredit | `balanceOfBatch()` |
+| Retired credits (by user) | CarbonCredit | `getLogs` → `CreditsRetired` (indexed by owner) |
+| Blacklisted issuers | CarbonCredit | `isBlacklisted(address)` |
+| Used retirement proofs | CarbonCredit | `isRetirementProofUsed(hash)` |
+| Active listings | Marketplace | `listings[id]` |
+| Last sold price | Marketplace | `getLastSoldPrice(creditId)` |
+| Trade history (by user) | Marketplace | `getLogs` → `Sold`, `Listed` (indexed by address) |
+| Proposals & votes | EcoForgeGovernance | `proposals[id]` |
+| Disputes & stakes | EcoForgeGovernance | `disputes[id]`, `disputeStakes[id]` |
+| Governance token balance | EcoForgeToken | `balanceOf(address)` |
+| Milestone progress | EcoForgeToken | `getUserProgress(address)` |
+| AVAX/USD price | Chainlink Price Feed | `latestRoundData()` |
 
-model OracleRequest {
-  id              String   @id @default(cuid())
-  requestType     String                    // impact_score, prediction_resolution
-  chainlinkReqId  String   @unique
-  creditId        Int
-  status          String                    // pending, fulfilled, failed
-  result          Json?
-  createdAt       DateTime @default(now())
-  fulfilledAt     DateTime?
-}
-```
+### 10.2 Off-chain data (IPFS via Lighthouse)
+
+| Data | Format | How |
+|---|---|---|
+| Credit metadata (name, description, attributes) | JSON | Fetch `metadataURI` from contract → fetch from IPFS gateway |
+| Satellite images | Image files | Stored in metadata JSON as `image` field → IPFS gateway |
+| Project documentation | PDF/links | Stored in metadata JSON |
+
+### 10.3 AI data (live, not cached)
+
+| Data | Source | How |
+|---|---|---|
+| Impact score breakdown | Claude API | Server Action `generateImpactScore` (on-demand) |
+| Dispute analysis | Claude API | Server Action `analyzeDispute` (on-demand) |
 
 ---
 
@@ -970,30 +976,16 @@ For the MVP, we focus on making credits **compatible** with DeFi:
 
 ---
 
-## 15. API Endpoints
+## 15. Server Actions (No API Routes)
 
-### AI Endpoints (Server-side only)
+There are no REST API endpoints. All server-side logic is in Next.js Server Actions:
 
-| Method | Route | Description |
-|--------|-------|-------------|
-| POST | `/api/ai/impact-score` | Generate AI impact score for a credit project |
-| POST | `/api/ai/trend-forecast` | Generate market trend forecast |
-| POST | `/api/ai/dispute-analysis` | Analyze a governance dispute |
+| Action | File | Input | Output |
+|--------|------|-------|--------|
+| `generateImpactScore` | `actions/generateImpactScore.ts` | projectData, imageBase64?, retirementProof? | `{ score, breakdown, confidence, reasoning }` |
+| `analyzeDispute` | `actions/analyzeDispute.ts` | creditData, disputeReason, imageBase64? | `{ validity, recommendation, confidence, reasoning }` |
 
-### Oracle Endpoints (Chainlink External Adapter)
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| GET | `/api/oracle/impact-score/[creditId]` | Return latest impact score for Chainlink |
-| GET | `/api/oracle/prediction/[predictionId]` | Return prediction resolution for Chainlink |
-
-### Credit Metadata Endpoints
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| GET | `/api/credits` | List all credits with filters |
-| GET | `/api/credits/[id]` | Get credit details + scores |
-| POST | `/api/credits` | Create credit metadata (pre-mint) |
+Both use `"use server"` directive. The Anthropic API key is only accessible server-side.
 
 ---
 
@@ -1027,35 +1019,25 @@ ecoforge/
 ├── out/                            # Compiled contract artifacts (ABI + bytecode)
 ├── src/                            # Next.js app
 │   ├── app/                        # App Router pages (see Section 9.1)
-│   ├── components/                 # React components (see Section 9.2)
-│   ├── hooks/                      # Custom React hooks
-│   │   ├── useCredits.ts
-│   │   ├── useMarketplace.ts
-│   │   ├── usePredictions.ts
-│   │   └── useGovernance.ts
-│   ├── services/                   # Business logic
-│   │   ├── ai/
-│   │   │   ├── claude.ts           # Claude API wrapper
-│   │   │   ├── impact-score.ts
-│   │   │   ├── trend-forecast.ts
-│   │   │   └── prompts.ts          # All AI prompts centralized
+│   ├── components/                 # React components (see FRONTEND_SPEC.md)
+│   ├── hooks/                      # Custom React hooks (see FRONTEND_SPEC.md)
+│   ├── actions/                    # Server Actions ("use server")
+│   │   ├── generateImpactScore.ts
+│   │   └── analyzeDispute.ts
+│   ├── services/
 │   │   ├── web3/
 │   │   │   ├── contracts.ts        # Contract ABIs + addresses
 │   │   │   └── config.ts           # wagmi config
 │   │   └── ipfs/
-│   │       └── pinata.ts           # IPFS upload service
-│   ├── lib/                        # Utilities
-│   │   ├── prisma.ts               # Prisma client
+│   │       └── lighthouse.ts       # IPFS upload service (Lighthouse SDK)
+│   ├── lib/
 │   │   └── utils.ts
-│   ├── types/                      # TypeScript types
+│   ├── types/
 │   │   ├── contracts.ts
 │   │   ├── ai.ts
 │   │   └── index.ts
-│   └── store/                      # Zustand stores
-│       ├── useWalletStore.ts
+│   └── stores/
 │       └── useMarketStore.ts
-├── prisma/
-│   └── schema.prisma
 ├── public/
 │   └── assets/
 ├── .env.local                      # API keys (NEVER commit)
@@ -1091,7 +1073,7 @@ ecoforge/
 - [ ] Implement impact score generation endpoint
 - [ ] Implement trend forecast endpoint
 - [ ] Implement dispute analysis endpoint
-- [ ] Set up IPFS (Pinata) integration
+- [ ] Set up IPFS (Lighthouse) integration
 
 ### Day 4 — Frontend Core
 
@@ -1139,11 +1121,8 @@ NEXT_PUBLIC_CHAIN_ID=43113
 ANTHROPIC_API_KEY=sk-ant-...
 
 # Database
-DATABASE_URL=postgresql://...
-
 # IPFS
-PINATA_API_KEY=...
-PINATA_SECRET_KEY=...
+LIGHTHOUSE_API_KEY=...
 
 # Chainlink
 CHAINLINK_NODE_URL=...
@@ -1234,7 +1213,7 @@ vercel --prod
 - [Anthropic Claude API](https://docs.anthropic.com/en/docs)
 - [wagmi Documentation](https://wagmi.sh)
 - [Next.js App Router](https://nextjs.org/docs/app)
-- [Pinata IPFS](https://docs.pinata.cloud/)
+- [Lighthouse Storage](https://docs.lighthouse.storage/)
 
 ---
 

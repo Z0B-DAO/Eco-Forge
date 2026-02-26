@@ -100,7 +100,6 @@ Crédits soumis directement par un porteur de projet, sans passer par un registr
 | Composant | Rôle |
 |---|---|
 | `ImpactScorePanel` | Affiche le score + breakdown (additionality, permanence, leakage, verification) + reasoning |
-| `TrendForecastPanel` | Affiche prédiction bullish/bearish, price targets, confidence, key drivers |
 | `AIInsightCard` | Card générique pour afficher un insight AI (réutilisable) |
 | `AnalyzeButton` | Bouton qui trigger le Server Action et affiche un loading pendant l'appel Claude (~3-5s) |
 
@@ -156,6 +155,9 @@ Crédits soumis directement par un porteur de projet, sans passer par un registr
 | `useBuyCredit()` | Prépare + envoie la tx `buyCredits()` |
 | `useListCredit()` | Prépare + envoie la tx `listCredits()` |
 | `useRetireCredit()` | Prépare + envoie la tx `retireCredits()` |
+| `useTradeHistory(address)` | Lit les events Sold/Listed/Cancelled filtrés par adresse (via `getLogs`) |
+| `useRetiredCredits(address)` | Lit les events CreditsRetired filtrés par adresse + calcule total CO2 |
+| `useLastSoldPrice(creditId)` | Lit `lastSoldPrice` depuis Marketplace (pour valoriser le portfolio) |
 | `useProposals()` | Lit les proposals depuis EcoForgeGovernance |
 | `useVote()` | Prépare + envoie la tx `vote()` |
 | `useDispute()` | Prépare + envoie la tx `disputeCredit()` → auto-crée une proposal |
@@ -167,13 +169,12 @@ Crédits soumis directement par un porteur de projet, sans passer par un registr
 
 ## Server Actions
 
-Les 3 seules fonctions server-side du projet. Elles vivent dans le code Next.js (`"use server"`) et protègent la clé API Anthropic.
+Les 2 seules fonctions server-side du projet. Elles vivent dans le code Next.js (`"use server"`) et protègent la clé API Anthropic.
 
 | Action | Input | Output | Appel Claude |
 |---|---|---|---|
-| `generateImpactScore` | projectData + imageBase64 | `{ score, breakdown, reasoning, confidence }` | Vision + texte |
-| `generateTrendForecast` | marketData (prix, news) | `{ prediction, targets, confidence, drivers }` | Texte seul |
-| `analyzeDispute` | disputeData (crédit + raison) | `{ validity, recommendation, reasoning }` | Texte seul |
+| `generateImpactScore` | projectData + imageBase64? + retirementProof? | `{ score, breakdown, proofConsistency, reasoning, confidence }` | Vision + texte |
+| `analyzeDispute` | creditData + disputeReason + imageBase64? | `{ validity, recommendation, reasoning, confidence, redFlags }` | Vision + texte |
 
 ---
 
@@ -201,7 +202,10 @@ Le reste du state vient directement des hooks wagmi (données on-chain) — pas 
 | Voting power | Smart contract EcoForgeToken (ERC-20) | `useGovernanceToken()` → `balanceOf()` |
 | Milestone progression | Smart contract EcoForgeToken | `useMilestoneProgress()` → `getUserProgress()` |
 | Balances user (portfolio) | Smart contract CarbonCredit (ERC-1155) | `balanceOfBatch()` |
-| Trend forecast | Claude API (live) | Server Action `generateTrendForecast` |
+| Crédits retirés par user | Events `CreditsRetired` (indexed) | `useRetiredCredits()` → `getLogs` filtré par address |
+| Total CO2 compensé | `tonnesCO2e` on-chain × quantité retirée | Calculé dans `useRetiredCredits()` |
+| Historique trades user | Events `Sold`, `Listed` (indexed) | `useTradeHistory()` → `getLogs` filtré par address |
+| Valeur d'un crédit (portfolio) | `lastSoldPrice` dans Marketplace | `useLastSoldPrice()` → `readContract` |
 | AVAX/USD prix | Chainlink price feed (on-chain) | `readContract` sur le feed Chainlink |
 
 ---
@@ -216,12 +220,20 @@ Le reste du state vient directement des hooks wagmi (données on-chain) — pas 
    - Registre source (Verra / Gold Standard / autre)
    - Numéro de série du retirement
    - Lien vers la preuve de retirement (URL registre)
-   - Données projet (nom, type, région, vintage year)
-   - Upload image satellite (optionnel)
-3. Upload metadata + image → IPFS (Lighthouse)
-4. Tx: CarbonCredit.createCertifiedCredit(params, registrySource, retirementProof)
-5. Crédit minté avec origin = Certified, status = Verified
-6. Tradeable immédiatement sur le marketplace
+   - Données projet (nom, type, région, vintage year, tonnes CO2e)
+   - Upload image satellite (optionnel mais recommandé)
+3. AI VERIFICATION (obligatoire) :
+   - Server Action : Claude analyse preuve de retirement + données projet + image
+   - Vérifie la cohérence (la preuve correspond-elle au projet ?)
+   - Génère un impact score + confidence
+   - Affiche le résultat à l'user
+4. Anti-double-bridge :
+   - Le contrat vérifie on-chain que le hash(registrySource + serialNumber) n'est pas déjà utilisé
+   - Si déjà bridgé → tx revert, message d'erreur clair dans l'UI
+5. Upload metadata + image + AI score → IPFS (Lighthouse)
+6. Tx: CarbonCredit.createCertifiedCredit(params, registrySource, retirementProof)
+7. Si AI confidence haute → minté comme Verified → tradeable immédiatement
+   Si AI confidence basse → minté comme Pending → review manuelle nécessaire
 ```
 
 ### Parcours B — Community Credit
@@ -229,18 +241,27 @@ Le reste du state vient directement des hooks wagmi (données on-chain) — pas 
 ```
 1. User choisit "Community (new project)"
 2. Formulaire :
-   - Données projet (nom, type, région, vintage year, description détaillée)
-   - Upload image satellite (obligatoire)
+   - Données projet (nom, type, région, vintage year, tonnes CO2e, description détaillée)
+   - Upload image satellite (OBLIGATOIRE)
    - Documentation du projet (PDF, liens)
    - Méthodologie utilisée
-3. Server Action : Claude Vision analyse l'image + données → génère impact score preview
+3. AI VERIFICATION (obligatoire) :
+   - Server Action : Claude Vision analyse l'image + données projet + documentation
+   - Génère impact score + breakdown + confidence
+   - Affiche le résultat preview à l'user
 4. User voit le score preview et confirme la soumission
-5. Upload metadata + image + score → IPFS (Lighthouse)
+5. Upload metadata + image + AI score → IPFS (Lighthouse)
 6. Tx: CarbonCredit.createCommunityCredit(params)
 7. Crédit minté avec origin = CommunityVerified, status = Pending
 8. Période de challenge DAO (7 jours)
 9. Si pas de challenge réussi → status passe à Verified → tradeable
 ```
+
+### AI vérification dans les DEUX cas
+
+Aucun crédit n'entre dans EcoForge sans passer par Claude. La différence :
+- **Certified** : Claude vérifie la cohérence preuve/données, pas la légitimité du projet (déjà certifié par Verra)
+- **Community** : Claude évalue la légitimité du projet lui-même (image satellite, additionality, etc.)
 
 ---
 
@@ -309,7 +330,6 @@ src/
 │   │   └── CreditFilters.tsx
 │   ├── ai/
 │   │   ├── ImpactScorePanel.tsx
-│   │   ├── TrendForecastPanel.tsx
 │   │   ├── AIInsightCard.tsx
 │   │   └── AnalyzeButton.tsx
 │   # predictions/ — V2, not in MVP
@@ -326,7 +346,7 @@ src/
 │   ├── charts/
 │   │   ├── PriceChart.tsx
 │   │   ├── ScoreHistoryChart.tsx
-│   │   └── PoolChart.tsx
+│   │   └── VoteChart.tsx
 │   └── common/
 │       ├── LoadingSpinner.tsx
 │       ├── Modal.tsx
@@ -339,6 +359,9 @@ src/
 │   ├── useBuyCredit.ts
 │   ├── useListCredit.ts
 │   ├── useRetireCredit.ts
+│   ├── useTradeHistory.ts
+│   ├── useRetiredCredits.ts
+│   ├── useLastSoldPrice.ts
 │   ├── useSearchCredits.ts
 │   ├── useProposals.ts
 │   ├── useVote.ts
@@ -348,7 +371,6 @@ src/
 │   └── useUserPortfolio.ts
 ├── actions/
 │   ├── generateImpactScore.ts          # "use server" — Claude Vision + texte
-│   ├── generateTrendForecast.ts        # "use server" — Claude texte
 │   └── analyzeDispute.ts              # "use server" — Claude texte
 ├── services/
 │   ├── web3/
