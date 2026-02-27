@@ -25,6 +25,7 @@ Chainlink Functions → Smart Contracts (push AI scores on-chain)
 - **AI:** Anthropic Claude API (Sonnet 4.6) via Server Actions only — **mocked for now** (SDK not installed yet)
 - **IPFS:** Lighthouse (permanent storage via Filecoin) — NOT Pinata
 - **Oracle:** Chainlink Functions (serverless)
+- **Scroll/Animation:** GSAP (ScrollTrigger) + Lenis (smooth scroll)
 - **State:** Zustand (1 store: useMarketStore)
 - **Charts:** Recharts
 
@@ -107,13 +108,48 @@ The Anthropic API key is NEVER exposed client-side.
 - `src/components/common/Toast.tsx` — Auto-dismiss, 3 variants
 - `src/components/common/EmptyState.tsx` — Empty state with optional action
 
-### TODO (Step 3 — Landing Page)
-- Cinematic landing page with 3D blob (Three.js/R3F, GLSL shaders)
-- Scroll-driven zoom transition (GSAP + Lenis)
-- About Us section with flippable avatar cards
-- Custom cursor system
-- Spec: `ecoforge-landing-prompt/PROMPT.md` (with 15 reference images)
-- First attempt reverted — needs rebuild with closer attention to spec
+### Done (Step 3 — Landing Page)
+
+**Files:**
+- `src/components/landing/Blob.tsx` — 3D particle blob (R3F + custom GLSL shaders)
+- `src/app/page.tsx` — Landing page: hero blob + scroll zoom + Launch App + About Us
+- `src/app/layout.tsx` — Font: Vipnagorgialla (local). Inline script for scroll-to-top on reload.
+- `src/app/globals.css` — Color palette, font variables, marquee animation, hidden scrollbar, user-select none
+
+**Blob Architecture (single StreakParticles component, all particles in one Points system):**
+- **Peau (skin):** 255k particles (95k uniform + 85k rim ±15° + 75k ultra-rim ±5°)
+  - Rim shader: `smoothstep(0.05, 0.85, rim)` — dense edge, particles fade toward center
+- **Reflets:** 3 lines (2 at depth 0.95, 1 at depth 0.75), 1200 PPL each
+- **Halo:** 20 layers per reflet particle, steep gradient (pow 2.5), spread 0.126
+- **Golden highlight:** Right side tinted gold
+- **Click reaction:** Heavy low-freq deformation. Random seed per click (unique shapes). Impulse 1.0, decay 0.978/frame (~3s). Amplitude 0.75. Listener on `window` (not canvas).
+- **Spontaneous pulses:** Every 6-11s, small impulse (0.15)
+- **Canvas:** `position: fixed` — blob visible behind all sections as ambient background
+
+**Scroll-Driven Zoom (GSAP + Lenis):**
+- 700vh scroll spacer, hero pinned via ScrollTrigger
+- 3% delay → zoom 3-80% (camera z=2.8→0.1, ease-in quadratic)
+- UI overlay (title + marquee) scales up with scroll → exits frame naturally (same 3-80% range)
+- Launch App button: simple opacity fade at 55-70% scroll (no scale)
+- 80-100%: dwell on button before pin releases
+- Scrollbar hidden, user-select none, scroll-to-top on reload
+- Lenis smooth scroll, scrub 0.8
+
+**About Us Section (below hero):**
+- Full transparent background (blob visible behind)
+- "About us :" title in Vipnagorgialla
+- DeVinci Blockchain: logo image + text (font-display)
+- Two circular avatars: Armand SÉCHON (`/images/Nft-armand.png`) + Noé WALES (`/images/avatar-noe.png`)
+- **Flip cards:** Click avatar → 3D Y-axis flip (500ms, perspective 1000px) → back face shows mirrored avatar image (transparent card effect) with dark overlay (bg-black/70) + X, LinkedIn, GitHub SVG icons (white, hover scale 1.25). Click icon → opens link (stopPropagation). Click card again → flips back. Auto-flip back after 250ms when mouse leaves (each card independent, separate timers). Links set to "#" placeholder — need real URLs.
+- `AvatarCard` component with props: name, image, imageStyle, x, linkedin, github
+
+**NOT implemented (decided against):**
+- Custom cursor system (user decided no)
+- Explosion click reaction (type A) — went with deformation (type B) instead
+
+**TODO (Landing Page):**
+- Add real social links (X, LinkedIn, GitHub) for Armand + Noé
+- Add content sections between Launch App and About Us (project info)
 
 ### TODO (Steps 4-8)
 - Step 4: Hooks (useCredits, useMarketplace, useBuyCredit, useVote, etc.)
@@ -134,14 +170,14 @@ The Anthropic API key is NEVER exposed client-side.
 - No unnecessary comments in code — explain in conversation, keep code clean
 - Git: frontend work on `frontend` branch, smart contracts on separate branch
 - tsconfig.json target set to ES2020 (for BigInt support)
-- Google Fonts loaded via `<link>` in layout.tsx `<head>` (NOT @import in CSS — breaks Tailwind v4)
+- Google Fonts loaded via `next/font/google` in layout.tsx (NOT @import in CSS — breaks Tailwind v4)
 - Landing page has its own layout (no Header/Footer) — use route group `(app)` for internal pages
 
 ## Spec Files
 
 - `ECOFORGE_SPEC.md` — Full project specification (contracts, AI, oracle, architecture, roadmap)
 - `FRONTEND_SPEC.md` — Frontend specification (pages, components, hooks, data sources, file structure)
-- `ecoforge-landing-prompt/PROMPT.md` — Landing page detailed spec with reference images
+- `ecoforge-landing-prompt/` — Original landing page spec + 15 ref images (diverged from spec, kept for visual reference only)
 
 ## Environment Variables Required
 
