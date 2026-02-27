@@ -87,6 +87,41 @@ The Anthropic API key is NEVER exposed client-side.
 - **False dispute:** Challenger's staked governance tokens burned
 - **Successful dispute:** Challenger gets tokens back + bonus reward
 
+## Current Progress
+
+### Done (Step 1 — Foundation)
+- `src/types/contracts.ts` — All on-chain TypeScript types (enums, interfaces, events)
+- `src/types/ai.ts` — AI response types (ImpactScore, DisputeAnalysis)
+- `src/types/index.ts` — Re-exports
+- `src/services/web3/contracts.ts` — ABIs for 5 contracts + CONTRACT_ADDRESSES
+- `src/lib/utils.ts` — 9 helper functions (formatAvax, truncateAddress, etc.)
+
+### Done (Step 2 — Layout + Common Components)
+- `src/components/layout/Header.tsx` — Sticky header with nav + ConnectButton
+- `src/components/layout/Footer.tsx` — Simple footer (server component)
+- `src/components/layout/Sidebar.tsx` — Reusable sidebar
+- `src/components/web3/NetworkGuard.tsx` — Chain check + switch button
+- `src/components/web3/TxStatus.tsx` — Transaction status toast
+- `src/components/common/LoadingSpinner.tsx` — 3 sizes
+- `src/components/common/Modal.tsx` — Escape + backdrop close
+- `src/components/common/Toast.tsx` — Auto-dismiss, 3 variants
+- `src/components/common/EmptyState.tsx` — Empty state with optional action
+
+### TODO (Step 3 — Landing Page)
+- Cinematic landing page with 3D blob (Three.js/R3F, GLSL shaders)
+- Scroll-driven zoom transition (GSAP + Lenis)
+- About Us section with flippable avatar cards
+- Custom cursor system
+- Spec: `ecoforge-landing-prompt/PROMPT.md` (with 15 reference images)
+- First attempt reverted — needs rebuild with closer attention to spec
+
+### TODO (Steps 4-8)
+- Step 4: Hooks (useCredits, useMarketplace, useBuyCredit, useVote, etc.)
+- Step 5: Zustand store (useMarketStore)
+- Step 6: Feature pages (marketplace, dashboard, create, governance, portfolio)
+- Step 7: Server Actions (generateImpactScore, analyzeDispute) — mocked
+- Step 8: IPFS service (Lighthouse)
+
 ## Key Conventions
 
 - All smart contract events use `indexed` parameters for frontend `getLogs` filtering
@@ -98,11 +133,15 @@ The Anthropic API key is NEVER exposed client-side.
 - Frontend sources in `src/` (Next.js app directory)
 - No unnecessary comments in code — explain in conversation, keep code clean
 - Git: frontend work on `frontend` branch, smart contracts on separate branch
+- tsconfig.json target set to ES2020 (for BigInt support)
+- Google Fonts loaded via `<link>` in layout.tsx `<head>` (NOT @import in CSS — breaks Tailwind v4)
+- Landing page has its own layout (no Header/Footer) — use route group `(app)` for internal pages
 
 ## Spec Files
 
 - `ECOFORGE_SPEC.md` — Full project specification (contracts, AI, oracle, architecture, roadmap)
 - `FRONTEND_SPEC.md` — Frontend specification (pages, components, hooks, data sources, file structure)
+- `ecoforge-landing-prompt/PROMPT.md` — Landing page detailed spec with reference images
 
 ## Environment Variables Required
 
