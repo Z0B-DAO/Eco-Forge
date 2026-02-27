@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import dynamic from "next/dynamic";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -245,9 +246,9 @@ export default function Home() {
             className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"
             style={{ opacity: 0 }}
           >
-            <button className="pointer-events-auto font-display rounded-full border border-white/80 bg-white/5 px-10 py-4 text-lg tracking-wide text-white backdrop-blur-sm transition-all hover:bg-white/10 hover:shadow-[0_0_30px_rgba(255,255,255,0.15)]">
+            <Link href="/dashboard" className="font-display rounded-full border border-white/80 bg-white/5 px-10 py-4 text-lg tracking-wide text-white backdrop-blur-sm transition-all hover:bg-white/10 hover:shadow-[0_0_30px_rgba(255,255,255,0.15)]">
               Launch App
-            </button>
+            </Link>
           </div>
         </div>
       </div>
