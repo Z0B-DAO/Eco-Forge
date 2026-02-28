@@ -148,13 +148,53 @@ The Anthropic API key is NEVER exposed client-side.
 - Explosion click reaction (type A) — went with deformation (type B) instead
 
 **TODO (Landing Page):**
-- Add real social links (X, LinkedIn, GitHub) for Armand + Noé
 - Add content sections between Launch App and About Us (project info)
+- Set Launch App button target (currently href="#" — decide /dashboard or /marketplace)
 
-### TODO (Steps 4-8)
-- Step 4: Hooks (useCredits, useMarketplace, useBuyCredit, useVote, etc.)
-- Step 5: Zustand store (useMarketStore)
-- Step 6: Feature pages (marketplace, dashboard, create, governance, portfolio)
+### Done (Step 4 — Hooks)
+16 custom hooks in `src/hooks/`:
+- **Read hooks:** `useCredits`, `useCreditDetail`, `useMarketplace`, `useLastSoldPrice`, `useGovernanceToken`, `useMilestoneProgress`, `useProposals`, `useTradeHistory`, `useRetiredCredits`, `useSearchCredits`, `useUserPortfolio`
+- **Write hooks:** `useBuyCredit`, `useListCredit`, `useRetireCredit`, `useVote`, `useDispute`
+- **Config:** `src/services/web3/config.ts` — wagmi config (Fuji chain, RPC, WalletConnect)
+- **Barrel export:** `src/hooks/index.ts`
+
+Pattern: scan events with `getLogs` → collect IDs → `readContract` per ID (no `getAll()` in Solidity). Write hooks return full tx lifecycle: `isPending` → `isConfirming` → `isConfirmed`.
+
+### Done (Step 5 — Zustand Store)
+- `src/stores/useMarketStore.ts` — Marketplace UI state (query, origin, status, sortBy, priceMin/Max, scoreMin/Max, projectTypes, regions). Client-side filtering only, no indexer.
+
+### Done (Step 6 — Feature Pages + Components)
+
+**Infrastructure:**
+- `src/app/providers.tsx` — RainbowKit + wagmi + React Query + darkTheme
+- `src/app/(app)/layout.tsx` — Route group layout (Header + Footer for internal pages)
+
+**Credit components:**
+- `src/components/credits/CreditCard.tsx` — Clickable card for marketplace grid
+- `src/components/credits/CreditOriginBadge.tsx` — Certified (green) / Community (blue) badge
+- `src/components/credits/CreditStatusBadge.tsx` — Verified/Pending/Suspended/Retired badges
+- `src/components/credits/ImpactScoreBadge.tsx` — Colored dot + score number
+- `src/components/credits/SearchBar.tsx` — Input connected to Zustand store
+- `src/components/credits/CreditFilters.tsx` — Filter chips (origin/status/sort) + reset
+- `src/components/credits/TradePanel.tsx` — Buy panel (amount input, total calc, tx lifecycle)
+- `src/components/credits/ChallengeButton.tsx` — Dispute button + Modal
+- `src/components/credits/RetireButton.tsx` — Burn/retire with amount input
+
+**Reward components:**
+- `src/components/rewards/TokenBalance.tsx` — Governance token balance + % supply
+- `src/components/rewards/MilestoneProgress.tsx` — Progress bar + 7 tier indicators
+
+**Pages (all 8 internal pages done):**
+- `/dashboard` — Wallet guard, 3 stat cards (token balance, milestones, overview), holdings table, recent activity
+- `/marketplace` — Search + filters + sorted credit grid
+- `/marketplace/[creditId]` — Credit detail + TradePanel + ChallengeButton + RetireButton
+- `/create` — Dual-path form (Certified/Community) with all fields + tx submission
+- `/governance` — Proposals list with ProposalCard (type badge, status, vote bar)
+- `/governance/[proposalId]` — Proposal detail with vote FOR/AGAINST buttons
+- `/governance/disputes` — Disputes list + challenge submission form (stake-to-dispute)
+- `/portfolio` — 3 summary cards + 3 tabs (Holdings table, Retired credits, Trade history)
+
+### TODO (Steps 7-8)
 - Step 7: Server Actions (generateImpactScore, analyzeDispute) — mocked
 - Step 8: IPFS service (Lighthouse)
 

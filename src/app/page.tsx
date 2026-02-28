@@ -260,12 +260,12 @@ export default function Home() {
           <h2 className="font-display text-4xl tracking-wider text-foreground md:text-5xl">
             About us :
           </h2>
-          <div className="flex items-center gap-3">
+          <a href="https://devinciblockchain.com/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3">
             <img src="/images/devinci-blockchain.png" alt="DeVinci Blockchain" className="h-12 w-auto md:h-14" />
             <span className="text-left font-display text-sm leading-tight tracking-wider text-foreground md:text-base">
               DeVinci<br />Blockchain
             </span>
-          </div>
+          </a>
         </div>
 
         {/* Avatars */}

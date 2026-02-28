@@ -584,6 +584,8 @@ function BlobScene() {
   const nextDelay = useRef(6 + Math.random() * 5);
   const { gl, camera } = useThree();
 
+  const zoomDoneRef = useRef(false);
+
   useFrame((_, delta) => {
     timeRef.current += delta;
 
@@ -594,9 +596,10 @@ function BlobScene() {
       const raw = Math.min(1, Math.max(0, (sp.current - 0.03) / 0.77));
       const progress = raw * raw;
       camera.position.z = 2.8 - progress * 2.7;
+      zoomDoneRef.current = progress >= 1;
     }
 
-    if (timeRef.current - lastSpontRef.current > nextDelay.current) {
+    if (!zoomDoneRef.current && timeRef.current - lastSpontRef.current > nextDelay.current) {
       clickTypeRef.current = 1;
       impulseRef.current = Math.max(impulseRef.current, 0.15);
       lastSpontRef.current = timeRef.current;
@@ -612,6 +615,7 @@ function BlobScene() {
 
   const clickSeedRef = useRef(0);
   const handleClick = useCallback(() => {
+    if (zoomDoneRef.current) return;
     clickTypeRef.current = 2;
     clickSeedRef.current = Math.random() * 1000.0;
     impulseRef.current = 1.0;
