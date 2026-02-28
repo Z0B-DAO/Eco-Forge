@@ -98,7 +98,7 @@ The Anthropic API key is NEVER exposed client-side.
 - `src/lib/utils.ts` — 9 helper functions (formatAvax, truncateAddress, etc.)
 
 ### Done (Step 2 — Layout + Common Components)
-- `src/components/layout/Header.tsx` — Sticky header with nav + ConnectButton
+- `src/components/layout/Header.tsx` — Sticky header with nav + CustomConnectButton (white band style) + AccountDropdown
 - `src/components/layout/Footer.tsx` — Simple footer (server component)
 - `src/components/layout/Sidebar.tsx` — Reusable sidebar
 - `src/components/web3/NetworkGuard.tsx` — Chain check + switch button
@@ -113,24 +113,28 @@ The Anthropic API key is NEVER exposed client-side.
 **Files:**
 - `src/components/landing/Blob.tsx` — 3D particle blob (R3F + custom GLSL shaders)
 - `src/app/page.tsx` — Landing page: hero blob + scroll zoom + Launch App + About Us
-- `src/app/layout.tsx` — Font: Vipnagorgialla (local). Inline script for scroll-to-top on reload.
-- `src/app/globals.css` — Color palette, font variables, marquee animation, hidden scrollbar, user-select none
+- `src/app/layout.tsx` — Fonts: Vipnagorgialla (local, display) + Space Grotesk (Google, body). Inline script for scroll-to-top on reload.
+- `src/app/globals.css` — Color palette, font variables (--font-sans: Space Grotesk, --font-display: Vipnagorgialla), marquee animation, hidden scrollbar, user-select none
 
 **Blob Architecture (single StreakParticles component, all particles in one Points system):**
 - **Peau (skin):** 255k particles (95k uniform + 85k rim ±15° + 75k ultra-rim ±5°)
   - Rim shader: `smoothstep(0.05, 0.85, rim)` — dense edge, particles fade toward center
-- **Reflets:** 3 lines (2 at depth 0.95, 1 at depth 0.75), 1200 PPL each
+- **Reflets:** 1 long (1200 PPL, depth 0.95) + 1-2 small curled (250-450 PPL, high curvature, rim-biased). Count randomized (2 or 3 total, 50/50).
 - **Halo:** 20 layers per reflet particle, steep gradient (pow 2.5), spread 0.126
 - **Golden highlight:** Right side tinted gold
-- **Click reaction:** Heavy low-freq deformation. Random seed per click (unique shapes). Impulse 1.0, decay 0.978/frame (~3s). Amplitude 0.75. Listener on `window` (not canvas).
-- **Spontaneous pulses:** Every 6-11s, small impulse (0.15)
+- **Click reaction — Directional:** Raycaster on invisible sphere (r=0.95) determines click on/outside blob.
+  - **Click ON blob:** Noise deformation weighted by proximity to click point. Amplitude 1.2. Focused via `smoothstep(-0.6, 1.0)`.
+  - **Click OUTSIDE blob:** Localized inward compression on closest surface (`smoothstep(0.1, 0.95)`), rest of blob reacts with normal noise deformation. No whole-blob translation.
+  - Random seed per click (unique shapes). Impulse 1.0, decay 0.978/frame (~3s). Delta capped at 100ms. Time wraps at 10000s.
+- **Spontaneous pulses:** Removed (caused periodic visual glitch — instantaneous impulse broke animation continuity).
+- **Formation animation:** Blob grows from center on page load. Exponential approach to 1.0 (`formationRef += (1-current) * 1.5 * delta`), ~2-3s to full size. `uFormation` uniform multiplies `blobR` in shader.
 - **Canvas:** `position: fixed` — blob visible behind all sections as ambient background
 
 **Scroll-Driven Zoom (GSAP + Lenis):**
 - 700vh scroll spacer, hero pinned via ScrollTrigger
 - 3% delay → zoom 3-80% (camera z=2.8→0.1, ease-in quadratic)
 - UI overlay (title + marquee) scales up with scroll → exits frame naturally (same 3-80% range)
-- Launch App button: simple opacity fade at 55-70% scroll (no scale)
+- Launch App button: links to `/marketplace`. Simple opacity fade at 55-70% scroll (no scale)
 - 80-100%: dwell on button before pin releases
 - Scrollbar hidden, user-select none, scroll-to-top on reload
 - Lenis smooth scroll, scrub 0.8
@@ -140,7 +144,7 @@ The Anthropic API key is NEVER exposed client-side.
 - "About us :" title in Vipnagorgialla
 - DeVinci Blockchain: logo image + text (font-display)
 - Two circular avatars: Armand SÉCHON (`/images/Nft-armand.png`) + Noé WALES (`/images/avatar-noe.png`)
-- **Flip cards:** Click avatar → 3D Y-axis flip (500ms, perspective 1000px) → back face shows mirrored avatar image (transparent card effect) with dark overlay (bg-black/70) + X, LinkedIn, GitHub SVG icons (white, hover scale 1.25). Click icon → opens link (stopPropagation). Click card again → flips back. Auto-flip back after 250ms when mouse leaves (each card independent, separate timers). Links set to "#" placeholder — need real URLs.
+- **Flip cards:** Hover avatar → 3D Y-axis flip (500ms, perspective 1000px) → back face shows mirrored avatar image (transparent card effect) with dark overlay (bg-black/70) + X, LinkedIn, GitHub SVG icons (white, hover scale 1.25). Click icon → opens link (stopPropagation). Auto-flip back after 250ms when mouse leaves (each card independent, separate timers).
 - `AvatarCard` component with props: name, image, imageStyle, x, linkedin, github
 
 **NOT implemented (decided against):**
@@ -149,7 +153,33 @@ The Anthropic API key is NEVER exposed client-side.
 
 **TODO (Landing Page):**
 - Add content sections between Launch App and About Us (project info)
-- Set Launch App button target (currently href="#" — decide /dashboard or /marketplace)
+
+### Done (Step 6.5 — Typography + Navigation + ConnectButton)
+
+**Typography system (dual font):**
+- **Space Grotesk** (`--font-sans`) — Body font for all app pages (UI, nav, data, inputs). Loaded via `next/font/google`.
+- **Vipnagorgialla** (`--font-display`) — Display font for landing page, logo "EcoForge" in Header, section titles. Loaded via `next/font/local`.
+- Tailwind v4: `--font-sans` in `@theme inline` overrides default `--default-font-family` for all elements.
+
+**Navigation:**
+- Header logo "EcoForge" links to `/marketplace` (not `/`)
+- Landing page "Launch App" button links to `/marketplace`
+
+**Custom ConnectButton (white band style):**
+- Uses `ConnectButton.Custom` from RainbowKit (level 3 customization)
+- Design inspired by the white marquee band on landing page
+- **Disconnected:** White bg, black text, Vipnagorgialla, uppercase, tracking-widest. Hover: inversion (black bg, white text, white outline)
+- **Connected:** Same white style + green dot + truncated address. Click opens custom `AccountDropdown` (not RainbowKit modal)
+- **Wrong network:** Red bg, white text, "WRONG NETWORK". Click opens RainbowKit chain modal
+- **AccountDropdown:** Custom dropdown (not RainbowKit modal). Black bg (`bg-background`), white/10 border. Shows displayName (Vipna) + full address + "Copy address" / "Disconnect" actions. Closes on outside click or Escape. Uses wagmi `useDisconnect`.
+
+**RainbowKit custom theme (`ecoForgeTheme`):**
+- Full custom `Theme` object in `providers.tsx` (not `darkTheme()` preset)
+- Modal: black `#0B0B0B` bg, white/5 border, 8px radius, blur(8px) overlay
+- Accent: white. Fonts: Space Grotesk. Radii: sharp (4px buttons, 8px modal). Shadows: minimal.
+- Connect modal (wallet selection) still uses RainbowKit UI — only account modal is fully custom
+
+**Backup:** `src/components/landing/Blob.backup.tsx` — pre-directional-click version
 
 ### Done (Step 4 — Hooks)
 16 custom hooks in `src/hooks/`:
@@ -166,7 +196,7 @@ Pattern: scan events with `getLogs` → collect IDs → `readContract` per ID (n
 ### Done (Step 6 — Feature Pages + Components)
 
 **Infrastructure:**
-- `src/app/providers.tsx` — RainbowKit + wagmi + React Query + darkTheme
+- `src/app/providers.tsx` — RainbowKit + wagmi + React Query + custom `ecoForgeTheme` (full Theme object)
 - `src/app/(app)/layout.tsx` — Route group layout (Header + Footer for internal pages)
 
 **Credit components:**
@@ -210,7 +240,7 @@ Pattern: scan events with `getLogs` → collect IDs → `readContract` per ID (n
 - No unnecessary comments in code — explain in conversation, keep code clean
 - Git: frontend work on `frontend` branch, smart contracts on separate branch
 - tsconfig.json target set to ES2020 (for BigInt support)
-- Google Fonts loaded via `next/font/google` in layout.tsx (NOT @import in CSS — breaks Tailwind v4)
+- Fonts: Space Grotesk (body, `next/font/google`) + Vipnagorgialla (display, `next/font/local`). NOT @import in CSS (breaks Tailwind v4)
 - Landing page has its own layout (no Header/Footer) — use route group `(app)` for internal pages
 
 ## Spec Files

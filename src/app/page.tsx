@@ -67,13 +67,12 @@ function AvatarCard({ name, image, imageStyle, x = "#", linkedin = "#", github =
   };
 
   const handleMouseLeave = () => {
-    if (flipped) {
-      timerRef.current = setTimeout(() => setFlipped(false), 250);
-    }
+    timerRef.current = setTimeout(() => setFlipped(false), 250);
   };
 
   const handleMouseEnter = () => {
     clearTimer();
+    setFlipped(true);
   };
 
   useEffect(() => {
@@ -85,7 +84,6 @@ function AvatarCard({ name, image, imageStyle, x = "#", linkedin = "#", github =
       <div
         className="h-[250px] w-[250px] cursor-pointer md:h-[300px] md:w-[300px] lg:h-[350px] lg:w-[350px]"
         style={{ perspective: "1000px" }}
-        onClick={() => { clearTimer(); setFlipped(!flipped); }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
@@ -246,7 +244,7 @@ export default function Home() {
             className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"
             style={{ opacity: 0 }}
           >
-            <Link href="/dashboard" className="font-display rounded-full border border-white/80 bg-white/5 px-10 py-4 text-lg tracking-wide text-white backdrop-blur-sm transition-all hover:bg-white/10 hover:shadow-[0_0_30px_rgba(255,255,255,0.15)]">
+            <Link href="/marketplace" className="font-display rounded-full border border-white/80 bg-white/5 px-10 py-4 text-lg tracking-wide text-white backdrop-blur-sm transition-all hover:bg-white/10 hover:shadow-[0_0_30px_rgba(255,255,255,0.15)]">
               Launch App
             </Link>
           </div>

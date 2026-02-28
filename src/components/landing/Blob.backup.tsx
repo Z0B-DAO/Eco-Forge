@@ -144,9 +144,6 @@ uniform float uImpulse;
 uniform float uClickType;
 uniform float uClickSeed;
 uniform float uVisibleLayer; // 0=all, 1=skin, 2=contour, 3=reflets, 4=halo
-uniform vec3 uClickDir;
-uniform float uClickMode; // 1.0=expand toward, -1.0=flee away
-uniform float uFormation; // 0=not born, 1=fully formed
 
 attribute float aPhase;
 attribute float aAlphaBase;
@@ -190,19 +187,12 @@ void main() {
       (dir.x * rs + dir.z * rc) * rct - dir.y * rst * 0.2
     );
     rotDir = normalize(rotDir);
-    float blobR = getBlobRadius(rotDir, uTime) * aDepthLayer * uFormation;
+    float blobR = getBlobRadius(rotDir, uTime) * aDepthLayer;
 
+    // Click displacement — heavy low-freq deformation
     if (uImpulse > 0.01) {
-      float facing = dot(rotDir, uClickDir);
-      float n3 = snoise(rotDir * 0.6 + uClickSeed) * uImpulse * 1.2;
-      if (uClickMode < 0.0) {
-        float fleeZone = smoothstep(0.1, 0.95, facing);
-        blobR += n3 * (1.0 - fleeZone);
-        blobR -= uImpulse * 0.35 * fleeZone;
-      } else {
-        float expandWeight = smoothstep(-0.6, 1.0, facing);
-        blobR += n3 * expandWeight;
-      }
+      float n3 = snoise(rotDir * 0.6 + uClickSeed) * uImpulse * 0.75;
+      blobR += n3;
     }
 
     vec3 worldPos = rotDir * blobR;
@@ -222,28 +212,19 @@ void main() {
       (dir.x * s + dir.z * c) * ct - dir.y * st * 0.2
     );
     finalDir = normalize(finalDir);
-    float blobR = getBlobRadius(finalDir, uTime) * aDepthLayer * uFormation;
+    float blobR = getBlobRadius(finalDir, uTime) * aDepthLayer;
 
+    // Click displacement — heavy low-freq deformation
     if (uImpulse > 0.01) {
-      float facing = dot(finalDir, uClickDir);
-      float n3 = snoise(finalDir * 0.6 + uClickSeed) * uImpulse * 1.2;
-      if (uClickMode < 0.0) {
-        float fleeZone = smoothstep(0.1, 0.95, facing);
-        blobR += n3 * (1.0 - fleeZone);
-        blobR -= uImpulse * 0.35 * fleeZone;
-      } else {
-        float expandWeight = smoothstep(-0.6, 1.0, facing);
-        blobR += n3 * expandWeight;
-      }
+      float n3 = snoise(finalDir * 0.6 + uClickSeed) * uImpulse * 0.75;
+      blobR += n3;
     }
 
     pos = finalDir * blobR;
     noiseDir = finalDir;
   }
 
-  float globalFacing = dot(normalize(pos), uClickDir);
-  float expandWeight = smoothstep(-0.6, 1.0, globalFacing);
-  pos += normalize(pos) * uImpulse * 0.06 * expandWeight;
+  pos += normalize(pos) * uImpulse * 0.04;
 
   vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
 
@@ -390,18 +371,12 @@ function StreakParticles({
   clickTypeRef,
   clickSeedRef,
   visibleLayerRef,
-  clickDirRef,
-  clickModeRef,
-  formationRef,
 }: {
   timeRef: React.RefObject<number>;
   impulseRef: React.RefObject<number>;
   clickTypeRef: React.RefObject<number>;
   clickSeedRef: React.RefObject<number>;
   visibleLayerRef: React.RefObject<number>;
-  clickDirRef: React.RefObject<THREE.Vector3>;
-  clickModeRef: React.RefObject<number>;
-  formationRef: React.RefObject<number>;
 }) {
   const matRef = useRef<THREE.ShaderMaterial>(null);
 
@@ -572,9 +547,6 @@ function StreakParticles({
     uClickType: { value: 0 },
     uClickSeed: { value: 0 },
     uVisibleLayer: { value: 0 },
-    uClickDir: { value: new THREE.Vector3(0, 0, 1) },
-    uClickMode: { value: 1.0 },
-    uFormation: { value: 0 },
   }), []);
 
   useFrame(() => {
@@ -584,9 +556,6 @@ function StreakParticles({
     matRef.current.uniforms.uClickType.value = clickTypeRef.current;
     matRef.current.uniforms.uClickSeed.value = clickSeedRef.current;
     matRef.current.uniforms.uVisibleLayer.value = visibleLayerRef.current;
-    matRef.current.uniforms.uClickDir.value.copy(clickDirRef.current);
-    matRef.current.uniforms.uClickMode.value = clickModeRef.current;
-    matRef.current.uniforms.uFormation.value = formationRef.current;
   });
 
   return (
@@ -617,15 +586,9 @@ function StreakParticles({
 function BlobScene() {
   const timeRef = useRef(0);
   const impulseRef = useRef(0);
-  const clickTypeRef = useRef(0);
-  const visibleLayerRef = useRef(0);
-  const clickDirRef = useRef(new THREE.Vector3(0, 0, 1));
-  const clickModeRef = useRef(1.0);
-  const formationRef = useRef(0);
+  const clickTypeRef = useRef(0); // 0=none, 1=explosion, 2=deformation
+  const visibleLayerRef = useRef(0); // 0=all, 1=skin, 2=contour, 3=reflets, 4=halo
   const { gl, camera } = useThree();
-
-  const raycaster = useMemo(() => new THREE.Raycaster(), []);
-  const blobSphere = useMemo(() => new THREE.Sphere(new THREE.Vector3(0, 0, 0), 0.95), []);
 
   const zoomDoneRef = useRef(false);
 
@@ -633,14 +596,10 @@ function BlobScene() {
     const delta = Math.min(rawDelta, 0.1);
     timeRef.current = (timeRef.current + delta) % 10000;
 
-    if (formationRef.current < 0.999) {
-      formationRef.current += (1.0 - formationRef.current) * 1.5 * delta;
-    } else {
-      formationRef.current = 1;
-    }
-
+    // Scroll-driven camera zoom
     const sp = (window as unknown as Record<string, { current: number }>).__scrollProgress;
     if (sp) {
+      // Delay 3%, zoom finishes at 80%, short dwell then About Us
       const raw = Math.min(1, Math.max(0, (sp.current - 0.03) / 0.77));
       const progress = raw * raw;
       camera.position.z = 2.8 - progress * 2.7;
@@ -655,35 +614,12 @@ function BlobScene() {
   });
 
   const clickSeedRef = useRef(0);
-  const handleClick = useCallback((e: MouseEvent) => {
+  const handleClick = useCallback(() => {
     if (zoomDoneRef.current) return;
-
-    const canvas = gl.domElement;
-    const rect = canvas.getBoundingClientRect();
-    const mouse = new THREE.Vector2(
-      ((e.clientX - rect.left) / rect.width) * 2 - 1,
-      -((e.clientY - rect.top) / rect.height) * 2 + 1
-    );
-
-    raycaster.setFromCamera(mouse, camera);
-    const ray = raycaster.ray;
-    const hitPoint = new THREE.Vector3();
-    const hit = ray.intersectSphere(blobSphere, hitPoint);
-
-    if (hit) {
-      clickDirRef.current.copy(hitPoint).normalize();
-      clickModeRef.current = 1.0;
-    } else {
-      const closest = new THREE.Vector3();
-      ray.closestPointToPoint(new THREE.Vector3(0, 0, 0), closest);
-      clickDirRef.current.copy(closest).normalize();
-      clickModeRef.current = -1.0;
-    }
-
     clickTypeRef.current = 2;
     clickSeedRef.current = Math.random() * 1000.0;
     impulseRef.current = 1.0;
-  }, [gl, camera, raycaster, blobSphere]);
+  }, []);
 
   useEffect(() => {
     window.addEventListener("mousedown", handleClick);
@@ -707,7 +643,7 @@ function BlobScene() {
 
   return (
     <>
-      <StreakParticles timeRef={timeRef} impulseRef={impulseRef} clickTypeRef={clickTypeRef} clickSeedRef={clickSeedRef} visibleLayerRef={visibleLayerRef} clickDirRef={clickDirRef} clickModeRef={clickModeRef} formationRef={formationRef} />
+      <StreakParticles timeRef={timeRef} impulseRef={impulseRef} clickTypeRef={clickTypeRef} clickSeedRef={clickSeedRef} visibleLayerRef={visibleLayerRef} />
 
       <EffectComposer>
         <Bloom

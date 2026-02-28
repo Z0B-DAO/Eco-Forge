@@ -1,11 +1,18 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { Space_Grotesk } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
 
 const vipnagorgialla = localFont({
   src: "../../public/fonts/Vipnagorgialla.otf",
   variable: "--font-vipnagorgialla",
+  display: "swap",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space-grotesk",
   display: "swap",
 });
 
@@ -25,7 +32,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: `history.scrollRestoration="manual";window.scrollTo(0,0);` }} />
       </head>
       <body
-        className={`${vipnagorgialla.variable} antialiased`}
+        className={`${vipnagorgialla.variable} ${spaceGrotesk.variable} antialiased`}
       >
         <Providers>{children}</Providers>
       </body>
