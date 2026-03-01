@@ -17,7 +17,7 @@ Chainlink Functions → Smart Contracts (push AI scores on-chain)
 
 ## Tech Stack
 
-- **Blockchain:** Avalanche C-Chain, Fuji Testnet (chainId 43113), Solidity ^0.8.20
+- **Blockchain:** Avalanche C-Chain, Fuji Testnet (chainId 43113), Solidity ^0.8.24
 - **Smart Contract Framework:** Foundry (forge, cast, anvil) — NOT Hardhat
 - **Frontend:** Next.js 14+ (App Router), TypeScript, Tailwind CSS
 - **Package Manager:** pnpm
@@ -31,15 +31,15 @@ Chainlink Functions → Smart Contracts (push AI scores on-chain)
 
 ## Smart Contracts (5 for MVP)
 
-1. **CarbonCredit.sol** (ERC-1155) — Carbon credit tokens. Hybrid model: Certified (bridged from registries with anti-double-bridge hash check) + Community Verified (native, AI + DAO validated). Includes blacklist for fraudulent issuers. `tonnesCO2e` stored on-chain for portfolio calculations.
+1. **CarbonCredit.sol** (ERC-1155 + AccessControl + Pausable) — Carbon credit tokens. Hybrid model: Certified (bridged from registries with anti-double-bridge hash check) + Community Verified (native, AI + DAO validated). Includes blacklist for fraudulent issuers, `disputed` flag for challenge periods, `tonnesCO2e` stored on-chain. Uses `CreditParams` helper struct. `createCertifiedCredit` takes `issuer` address + `verified` bool (MINTER_ROLE acts on behalf). Only `Verified` credits can be listed on Marketplace.
 
-2. **Marketplace.sol** — List/buy/sell credits. Tracks `lastSoldPrice` per credit for portfolio valuation. Platform fee sent to DAO treasury.
+2. **Marketplace.sol** (ReentrancyGuard) — List/buy/sell credits. Verifies credit status `Verified` before listing. Tracks `lastSoldPrice` per credit. Platform fee (basis points) sent to DAO treasury via pull-pattern (`accumulatedFees` + `withdrawFees`). Emits `PriceUpdated` on price changes. `nonReentrant` on all payment functions.
 
-3. **EcoForgeGovernance.sol** — DAO with 2 scopes only: Credit Eligibility + Dispute Resolution. Stake-to-dispute mechanism (challengers must lock governance tokens). Auto-creates proposals from disputes. Executes punishment on fraud (blacklist issuer + burn all tokens).
+3. **EcoForgeGovernance.sol** — DAO with 2 scopes: Credit Eligibility (executes `actionCalldata` via `address(this).call`) + Dispute Resolution (auto-resolves via `_resolveDisputeForWin`). Stake-to-dispute via burn-at-stake / re-mint-on-win pattern (soulbound tokens can't transfer). `resolveDisputeAgainst` for AGAINST wins. `disputeBonusAmount` for successful challengers. `vote()` calls `recordAction` via try/catch. Marks credits disputed on-chain.
 
-4. **EcoForgeToken.sol** (ERC-20) — Governance token. NON-TRANSFERABLE (soulbound). Milestone-based rewards: actions are counted per wallet, tokens minted at tiers (5→1, 15→2, 30→3, 50→5, 100→8, 200→13, 500→21). Daily action cap per wallet (anti-sybil). Can be burned as punishment for fraud or false disputes.
+4. **EcoForgeToken.sol** (ERC-20 + AccessControl, soulbound via `_update` override) — Governance token. NON-TRANSFERABLE. Milestone-based rewards (5→1, 15→2, 30→3, 50→5, 100→8, 200→13, 500→21). Daily action cap. `mint(to, amount)` for dispute stake returns + bonus. Can be burned as punishment.
 
-5. **EcoForgeOracle.sol** — Chainlink Functions client. Pushes AI-generated impact scores on-chain.
+5. **EcoForgeOracle.sol** (FunctionsClient + AccessControl) — Chainlink Functions client. `REQUESTER_ROLE` restricts who can trigger score requests. Needs `VERIFIER_ROLE` on CarbonCredit.
 
 **NOT in MVP:** PredictionPool.sol (V2)
 
