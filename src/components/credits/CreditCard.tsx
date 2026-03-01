@@ -34,7 +34,7 @@ export function CreditCard({ credit, listing }: CreditCardProps) {
           <span className="text-zinc-100 font-medium">{Number(credit.tonnesCO2e)}</span> tCO2e
         </div>
         {listing && (
-          <div className="text-sm font-medium text-white">
+          <div className="flex items-center gap-1 text-sm font-medium text-white">
             {formatAvax(listing.pricePerUnit)} <AvaxLogo size={14} />
           </div>
         )}

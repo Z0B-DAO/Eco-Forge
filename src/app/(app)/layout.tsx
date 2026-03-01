@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Sidebar, SIDEBAR_COLLAPSED, SIDEBAR_EXPANDED } from "@/components/layout/Sidebar"
 import { TopBar } from "@/components/layout/Header"
-import { Footer } from "@/components/layout/Footer"
+import { Footer, FOOTER_H } from "@/components/layout/Footer"
 
 const TOPBAR_H = 80
 
@@ -135,8 +135,8 @@ export default function AppLayout({
       hasInitialized.current = true
       requestAnimationFrame(() => {
         setPhase("enter")
-        setTimeout(() => setPhase("settle"), 2000)
-        setTimeout(() => setPhase("idle"), 2600)
+        setTimeout(() => setPhase("settle"), 1400)
+        setTimeout(() => setPhase("idle"), 2000)
       })
       return
     }
@@ -153,9 +153,9 @@ export default function AppLayout({
       }
       if (contentRef.current) contentRef.current.style.visibility = ""
       setPhase("settle")
-    }, 2600)
+    }, 2000)
 
-    const t3 = setTimeout(() => setPhase("idle"), 3400)
+    const t3 = setTimeout(() => setPhase("idle"), 2600)
 
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
   }, [navKey])
@@ -206,12 +206,12 @@ export default function AppLayout({
   const isAnimating = phase !== "idle"
 
   return (
-    <div className={`min-h-screen bg-background text-foreground ${isAnimating ? "overflow-hidden" : "overflow-x-hidden"}`}>
+    <div className={`h-screen bg-background text-foreground overflow-hidden`}>
       <div className="transition-opacity duration-1000" style={{ opacity: dezooming ? 0 : 1, pointerEvents: dezooming ? "none" : "auto" }}>
         <Sidebar open={sidebarOpen} onOpen={() => setSidebarOpen(true)} onClose={() => setSidebarOpen(false)} hiding={phase === "pre" || phase === "exit" || phase === "enter"} />
 
         <motion.div
-          className="relative z-[60] border border-white rounded-2xl"
+          className="fixed top-0 left-0 right-0 z-[60] border border-white rounded-2xl"
           initial={false}
           animate={{
             y: phase === "exit" || phase === "enter" || phase === "pre" ? "-100%" : "0%"
@@ -223,11 +223,12 @@ export default function AppLayout({
 
         <div
           className="transition-[margin-left] duration-300 ease-out"
-          style={{ marginLeft: sidebarOpen ? SIDEBAR_EXPANDED - 1 : SIDEBAR_COLLAPSED - 1 }}
+          style={{ marginLeft: sidebarOpen ? SIDEBAR_EXPANDED - 1 : SIDEBAR_COLLAPSED - 1, paddingTop: TOPBAR_H + 1 }}
         >
           <motion.div
             ref={(el) => { contentRef.current = el; newPageRef.current = el }}
-            className="relative z-20 border border-white rounded-t-2xl border-b-0 -mt-px min-h-screen flex flex-col"
+            className="relative z-20 border border-white rounded-2xl flex flex-col"
+            style={{ height: `calc(100vh - ${TOPBAR_H + 1}px)` }}
             initial={false}
             animate={{
               y: phase === "exit" || phase === "pre" ? "100vh"
@@ -237,16 +238,17 @@ export default function AppLayout({
             transition={
               phase === "pre" || phase === "exit" || phase === "idle"
                 ? { duration: 0 }
-                : { duration: phase === "settle" ? 0.6 : 2, ease: [0.25, 0.1, 0.25, 1] }
+                : { duration: phase === "settle" ? 0.6 : 1.2, ease: phase === "settle" ? [0.25, 0.1, 0.25, 1] : [0.45, 0, 0.1, 1] }
             }
           >
-            <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-3">
+            <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-3" style={{ paddingBottom: FOOTER_H }}>
               {children}
             </main>
-            <Footer />
           </motion.div>
         </div>
       </div>
+
+      {!dezooming && <Footer />}
 
       {dezooming && (
         <div

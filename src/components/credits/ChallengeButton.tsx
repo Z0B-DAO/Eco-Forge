@@ -18,7 +18,7 @@ export function ChallengeButton({ creditId }: { creditId: bigint }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="rounded-lg border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10"
+        className="rounded-xl border-[0.5px] border-white/60 bg-[#111111] px-4 py-2 text-base font-semibold text-red-400"
       >
         Challenge this credit
       </button>

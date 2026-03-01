@@ -9,7 +9,7 @@ const NAV_ITEMS = [
     href: "/marketplace",
     label: "Marketplace",
     icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
         <line x1="3" y1="6" x2="21" y2="6" />
         <path d="M16 10a4 4 0 01-8 0" />
@@ -20,7 +20,7 @@ const NAV_ITEMS = [
     href: "/dashboard",
     label: "Dashboard",
     icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="7" height="7" />
         <rect x="14" y="3" width="7" height="7" />
         <rect x="3" y="14" width="7" height="7" />
@@ -32,7 +32,7 @@ const NAV_ITEMS = [
     href: "/governance",
     label: "Governance",
     icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
       </svg>
     ),
@@ -50,7 +50,7 @@ const NAV_ITEMS = [
     href: "/",
     label: "Exit",
     icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
         <polyline points="16 17 21 12 16 7" />
         <line x1="21" y1="12" x2="9" y2="12" />
@@ -59,7 +59,7 @@ const NAV_ITEMS = [
   },
 ]
 
-export const SIDEBAR_COLLAPSED = 66
+export const SIDEBAR_COLLAPSED = 82
 export const SIDEBAR_EXPANDED = 260
 
 export function Sidebar({ open, onOpen, onClose, hiding }: { open: boolean; onOpen: () => void; onClose: () => void; hiding?: boolean }) {
@@ -77,7 +77,7 @@ export function Sidebar({ open, onOpen, onClose, hiding }: { open: boolean; onOp
     >
       <div className="h-[82px] pointer-events-none" />
 
-      <nav className="flex flex-1 flex-col gap-2 border border-white rounded-t-2xl border-b-0 bg-background -mt-px p-2">
+      <nav className="flex flex-1 flex-col gap-2 border border-white rounded-t-2xl border-b-0 bg-background -mt-px px-4 py-2">
         {NAV_ITEMS.map((item) => {
           const isActive =
             item.href === "/create" || item.href === "/"
@@ -92,7 +92,7 @@ export function Sidebar({ open, onOpen, onClose, hiding }: { open: boolean; onOp
               className={`relative flex h-12 w-full items-center rounded-full border overflow-hidden backdrop-blur-sm transition-all duration-300 ease-out ${
                 isActive
                   ? "border-white bg-white/10 text-white"
-                  : "border-white/80 bg-white/5 text-white/40 hover:text-white/70"
+                  : "border-white/80 bg-white/5 text-white/70 hover:text-white"
               }`}
             >
               <div className="flex h-12 w-12 shrink-0 items-center justify-center">

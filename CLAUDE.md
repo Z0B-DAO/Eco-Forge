@@ -98,7 +98,7 @@ The Anthropic API key is NEVER exposed client-side.
 
 ### Done (Step 2 — Layout + Common Components)
 - `src/components/layout/Header.tsx` — Exports `TopBar` (YouTube-style: hamburger + logo + search + wallet)
-- `src/components/layout/Footer.tsx` — Simple footer, `border-[#1E1E1E]`, `text-[#888888]`
+- `src/components/layout/Footer.tsx` — Marquee sandwich footer (orange 3px + white marquee + orange 3px), `fixed bottom-0 z-[55] pointer-events-none`. Exports `FOOTER_H` (28px). Same marquee as landing page.
 - `src/components/layout/Sidebar.tsx` — Drawer sidebar (5 nav items with SVG icons, opens on hamburger click)
 - `src/components/web3/NetworkGuard.tsx` — Chain check + switch button
 - `src/components/web3/TxStatus.tsx` — Transaction status toast
@@ -114,7 +114,7 @@ The Anthropic API key is NEVER exposed client-side.
 - `src/components/layout/SharedBlob.tsx` — Client wrapper for dynamic import of Blob (used in root layout)
 - `src/app/page.tsx` — Landing page: scroll zoom + Launch App + About Us (no Blob render — uses shared blob)
 - `src/app/layout.tsx` — Fonts + `<SharedBlob />` (shared blob instance for entire app). Inline script for scroll-to-top on reload.
-- `src/app/globals.css` — Color palette, font variables (--font-sans: Satoshi, --font-display: Vipnagorgialla), marquee animation, hidden scrollbar, user-select none
+- `src/app/globals.css` — Color palette, font variables (--font-sans: Satoshi, --font-display: Vipnagorgialla), marquee animation, hidden scrollbar, user-select none, `overscroll-behavior: none` on html+body (disables macOS rubber-band bounce)
 
 **Blob Architecture (single StreakParticles component, all particles in one Points system):**
 - **Peau (skin):** 255k particles (95k uniform + 85k rim ±15° + 75k ultra-rim ±5°)
@@ -141,7 +141,8 @@ The Anthropic API key is NEVER exposed client-side.
 **Scroll-Driven Zoom (GSAP + Lenis):**
 - 700vh scroll spacer, hero pinned via ScrollTrigger
 - 3% delay → zoom 3-80% (camera z=2.8→0.1, ease-in quadratic)
-- UI overlay (title + marquee) scales up with scroll → exits frame naturally (same 3-80% range)
+- UI overlay (title + orange/white/orange marquee sandwich) scales up with scroll → exits frame naturally (same 3-80% range)
+- **Marquee sandwich:** 3px `#E84142` orange bar on top + white marquee bar + 3px `#E84142` orange bar on bottom. Same sandwich in dezoom overlay.
 - Launch App button: links to `/marketplace`. No hover effects. Opacity fade at 60-70% scroll, clickable at 65%. No scale.
 - 80-100%: dwell on button before pin releases
 - Scrollbar hidden, user-select none, scroll-to-top on reload
@@ -171,21 +172,21 @@ The Anthropic API key is NEVER exposed client-side.
 
 **Navigation — YouTube-style TopBar + Always-Visible Sidebar:**
 - **TopBar** (`src/components/layout/Header.tsx` → exports `TopBar`):
-  - `sticky top-0 z-30`, height `h-20` (80px), `z-[60]` with `border border-white rounded-2xl`
-  - Full width, does NOT shift when sidebar opens. Fixed position above sidebar (z-[60] > z-50).
+  - `fixed top-0 left-0 right-0 z-[60]` with `border border-white rounded-2xl`, height `h-20` (80px)
+  - Full width, does NOT shift when sidebar opens. Fixed position above sidebar (z-[60] > z-50). Always visible — content scrolls underneath.
   - Left: hamburger button (48px circle, 3 lines SVG, glass style, click toggles sidebar, hover opens sidebar) + "EcoForge" logo (font-display, links to `/marketplace`)
   - Center: SearchBar (only on `/marketplace` page) — `rounded-full border border-white/80 bg-white/5 backdrop-blur-sm`, max-w-2xl, connected to Zustand store
-  - Right: "+" Create circle (48px, links to `/create`, tooltip on hover) + ConnectButton (expand-on-hover disconnect)
+  - Right: ConnectButton (expand-on-hover disconnect)
 - **Sidebar** (`src/components/layout/Sidebar.tsx`) — Always-visible icon bar + push expand:
-  - **Always visible** at collapsed width (66px, `SIDEBAR_COLLAPSED`). Shows 5 nav items as 48px glass circles (`border border-white/80 bg-white/5 backdrop-blur-sm rounded-full`).
+  - **Always visible** at collapsed width (82px, `SIDEBAR_COLLAPSED`). Shows 5 nav items as 48px glass circles (`border border-white/80 bg-white/5 backdrop-blur-sm rounded-full`). Collapsed width = 1px border + 16px padding + 48px button + 16px padding + 1px border = 82px — circles perfectly aligned with hamburger button above.
   - Expands to 260px (`SIDEBAR_EXPANDED`) on hover (`onMouseEnter`/`onMouseLeave`). Circles expand into pills with text labels fading in (same expand animation as connect/disconnect button). Width transition via CSS `transition-[width] duration-300`.
   - `fixed left-0 top-0 z-50`, `motion.aside` with `animate={{ x }}` (0.8s for page transition hiding)
-  - Spacer `h-[82px]` aligns nav below TopBar, nav frame: `border border-white rounded-t-2xl border-b-0 bg-background p-2`
-  - 5 nav items with SVG icons (24x24, outline): Marketplace, Dashboard, Governance, Create, **Exit** (in line with others, NOT at bottom)
-  - Active state: `border-white bg-white/10 text-white`, inactive: `border-white/80 bg-white/5 text-white/40 hover:text-white/70`
+  - Spacer `h-[82px]` aligns nav below TopBar, nav frame: `border border-white rounded-t-2xl border-b-0 bg-background px-4 py-2`
+  - 5 nav items with SVG icons (24x24, strokeWidth 2, outline): Marketplace, Dashboard, Governance, Create, **Exit** (in line with others, NOT at bottom)
+  - Active state: `border-white bg-white/10 text-white`, inactive: `border-white/80 bg-white/5 text-white/70 hover:text-white`
   - Click on nav item auto-closes sidebar
   - `hiding` prop: during page transition (pre/exit/enter phases), sidebar slides out left in 0.8s
-  - Exports `SIDEBAR_COLLAPSED` (66) and `SIDEBAR_EXPANDED` (260) constants
+  - Exports `SIDEBAR_COLLAPSED` (82) and `SIDEBAR_EXPANDED` (260) constants
   - **Push behavior:** Content area shifts right — `marginLeft: SIDEBAR_EXPANDED - 1` (open) or `SIDEBAR_COLLAPSED - 1` (closed) with CSS transition 300ms
 
 **Button design convention (Launch App style):**
@@ -195,9 +196,8 @@ The Anthropic API key is NEVER exposed client-side.
 **Custom ConnectButton (circle wallet style):**
 - Uses `ConnectButton.Custom` from RainbowKit
 - **Disconnected:** Rounded pill, glass style, uppercase "Connect"
-- **Connected:** Circle 48px → expands to 155px on hover showing "Disconnect" (centered text). On disconnect → dispatches `ecoforge:exit` custom event → triggers dezoom animation → navigates to `/`
+- **Connected:** Circle 48px (wallet icon 32px) → expands to 155px on hover showing "Disconnect" (centered text). On disconnect → dispatches `ecoforge:exit` custom event → triggers dezoom animation → navigates to `/`
 - **Wrong network:** Red glass pill
-- **"+" Create:** Circle 48px with tooltip, glass style
 
 **RainbowKit custom theme (`ecoForgeTheme`):**
 - Full custom `Theme` object in `providers.tsx`
@@ -230,15 +230,17 @@ Pattern: scan events with `getLogs` → collect IDs → `readContract` per ID (n
 - On click: DOM clone created, real content hidden via `el.style.visibility = "hidden"` (sync DOM, prevents flash)
 - Links to `/` trigger dezoom animation instead of page transition (see Dezoom section below)
 - **Phase 1 (EXIT, 0→600ms):** TopBar slides up (`y: -100%`, 0.8s), Sidebar slides left (0.8s, same timing). DOM clone shrinks `scale(0.85)`. Real content teleported to `y: 100vh` with `duration: 0` (invisible behind clone).
-- **Phase 2 (ENTER, 600ms→2600ms):** `scrollTo(0,0)`. Content visibility restored in first rAF tick. New page slides up from `y: 100vh` to `y: -80px` (covers TopBar area, 2s ease). Clone is clipped by rAF loop as new page covers it.
-- **Phase 3 (SETTLE, 2600ms→3400ms):** TopBar slides back down (`y: 0`), new page shifts from `y: -80px` to `y: 0` (pushed down by TopBar, 0.6s). Clone force-removed + visibility safety net.
-- **Phase 4 (IDLE, 3400ms+):** Stable state, `duration: 0` on motion.div.
+- **Phase 2 (ENTER, 600ms→1800ms):** `scrollTo(0,0)`. Content visibility restored in first rAF tick. New page slides up from `y: 100vh` to `y: -80px` (covers TopBar area, 1.2s ease-in-out `[0.45, 0, 0.1, 1]` — starts slow, accelerates, decelerates gently at top). Clone is clipped by rAF loop as new page covers it.
+- **Pause (1800ms→2000ms):** 200ms rest before settle.
+- **Phase 3 (SETTLE, 2000ms→2600ms):** TopBar slides back down (`y: 0`), new page shifts from `y: -80px` to `y: 0` (pushed down by TopBar, 0.6s). Clone force-removed + visibility safety net.
+- **Phase 4 (IDLE, 2600ms+):** Stable state, `duration: 0` on motion.div.
 - **Single motion.div** always rendered (no conditional div/motion.div swap — prevents flash on mount).
 - **Clone clip-path (rAF-synced):** Runs during ENTER phase only. Reads `newPage.getBoundingClientRect().top` and `clone.getBoundingClientRect()` each frame. Converts screen-space clip to element-space (accounts for clone's animated `scale(0.85)` transform): `elementClip = screenClip / scale`. Also restores `visibility` on first tick.
-- **First page load (from landing):** Uses `"pre"` phase (positions everything off-screen with `duration: 0`, no `initial` prop — avoids strict-mode double-mount bugs). `hasInitialized` ref guards against duplicate setup. Sequence: pre → rAF → enter (2s) → settle (+2000ms) → idle (+2600ms). Timers created inside rAF with no cleanup (immune to strict-mode teardown).
+- **First page load (from landing):** Uses `"pre"` phase (positions everything off-screen with `duration: 0`, no `initial` prop — avoids strict-mode double-mount bugs). `hasInitialized` ref guards against duplicate setup. Sequence: pre → rAF → enter (1.2s) → settle (+1400ms) → idle (+2000ms). Timers created inside rAF with no cleanup (immune to strict-mode teardown).
 - **Scroll reset:** `useEffect([pathname])` forces `scrollTo(0,0)` at 0ms, 50ms, 150ms (handles GSAP/Lenis scroll residue from landing page).
 - Blob visible as ambient background on ALL pages (shared instance in root layout, fixed, z-0)
-- Parent container: `overflow-hidden` during animation (prevents scrollbar from off-screen page), `overflow-x-hidden` at rest (allows vertical scroll)
+- Parent container: `overflow-hidden` during animation, `overflow-x-hidden` at rest
+- **Fixed header + footer layout:** TopBar `fixed top-0 z-[60]`, Footer `fixed bottom-0 z-[55]`. Content wrapper has `paddingTop: TOPBAR_H` (80px) + `paddingBottom: FOOTER_H` (28px) on main. Content `minHeight: calc(100vh - 80px)` — no scroll when content fits, normal scroll when it overflows (header + footer always visible).
 
 **Dezoom animation (Exit/Disconnect → Landing Page):**
 - Triggered by: clicking Exit link (`href="/"`) in sidebar OR Disconnect button (dispatches `ecoforge:exit` custom event)
@@ -248,27 +250,29 @@ Pattern: scan events with `getLogs` → collect IDs → `readContract` per ID (n
   1. `delete window.__blobTargetZ` → frees camera from 0.1 lock
   2. `window.__blobDezoom = { active: true, onComplete: () => router.push("/") }` → BlobScene lerps camera z from 0.1 → 2.8 (speed 3.5x, ~1.2s)
   3. UI wrapper: `opacity: 0` (CSS transition 1s) + `pointerEvents: none` → app UI fades out
-  4. Dezoom overlay appears: title "EcoForge" + white marquee bar, scaled inversely with dezoom progress. Formula: `scale = 1 + (1-progress)² × 8` (same as landing page zoom but reversed). At start: scale(9) (off-screen). At end: scale(1) (normal position). rAF loop reads `window.__blobDezoomProgress` and updates overlay transform.
+  4. Dezoom overlay appears: title "EcoForge" + orange/white/orange marquee sandwich bar, scaled inversely with dezoom progress. Formula: `scale = 1 + (1-progress)² × 8` (same as landing page zoom but reversed). At start: scale(9) (off-screen). At end: scale(1) (normal position). rAF loop reads `window.__blobDezoomProgress` and updates overlay transform.
   5. Camera reaches 2.75 → `onComplete()` → `router.push("/")` → landing page mounts with scroll zoom ready
 - **Zero flash:** shared blob Canvas never unmounts. Title + marquee enter the frame smoothly during dezoom.
 - Sidebar auto-closes when dezoom starts
+- Footer is outside the dezoom opacity wrapper — always visible during dezoom (dezoom overlay has its own marquee at z-[70] above)
 
 **Card-style page layout:**
-- Content wrapped in bordered card: `border border-white rounded-t-2xl border-b-0` (white border, rounded top corners, no bottom border — extends infinitely downward)
+- Content wrapped in bordered card: `border border-white rounded-t-2xl border-b-0` (white border, rounded top corners, no bottom border)
 - TopBar also bordered: `border border-white rounded-2xl`
-- Borders overlap between TopBar and content via `-mt-px` on content div (single line, not double)
+- Content starts below fixed TopBar via `paddingTop: TOPBAR_H` on parent div, connected with `-mt-px`
 - Border width matches button borders (1px) for visual consistency
-- **Footer:** Sticky to bottom of viewport when content is short (`flex flex-col` on content card + `flex-1` on main)
+- **Footer:** Marquee sandwich `fixed bottom-0 z-[55]`, always visible on all app pages. `pointer-events-none`. Content has `paddingBottom: FOOTER_H` so last elements aren't hidden behind footer.
 
 **Credit components:**
 - `src/components/credits/CreditCard.tsx` — Card: project name (left) + origin badge (right) on top row, projectType/region, tonnes + price. `border-[0.5px] border-white/60 bg-[#111111]`. No hover effects.
-- `src/components/credits/CreditOriginBadge.tsx` — Certified (white/monochrome) / Community (blue) badge
+- `src/components/credits/CreditOriginBadge.tsx` — Certified (turquoise/teal) / Community (blue) badge
 - `src/components/credits/CreditStatusBadge.tsx` — Verified (white)/Pending/Suspended/Retired badges
 - `src/components/credits/ImpactScoreBadge.tsx` — Colored dot + score number (removed from CreditCard, kept for detail page)
 - `src/components/credits/SearchBar.tsx` — **Deprecated** (search now in TopBar, connected to Zustand store, only on `/marketplace`)
 - `src/components/credits/CreditFilters.tsx` — YouTube-style horizontal pill row, single line, separated by vertical bars (`bg-white/40`). Active: `bg-white text-background`. Inactive: `bg-white/10`. No hover effects. Toggle on re-click. Reset "✕" button.
-- `src/components/credits/TradePanel.tsx` — Buy panel (amount input, total calc, tx lifecycle)
-- `src/components/credits/ChallengeButton.tsx` — Dispute button + Modal
+- `src/components/credits/TradePanel.tsx` — Buy panel (custom −/+ buttons, seller address full with click-to-copy, gas fee estimate, total calc, tx lifecycle). All values in `font-mono`. Seller address styled identically to Issuer (`text-zinc-100`, no hover). Card style `border-[0.5px] border-white/60 bg-[#111111]`.
+- `src/components/credits/ChallengeButton.tsx` — Dispute button (card style) + Modal
+- `src/components/common/AvaxLogo.tsx` — AVAX logo SVG component (red circle `#E84142` + white triangle), `size` prop, `align-middle`
 - `src/components/credits/RetireButton.tsx` — Burn/retire with amount input
 
 **Reward components:**
@@ -276,9 +280,9 @@ Pattern: scan events with `getLogs` → collect IDs → `readContract` per ID (n
 - `src/components/rewards/MilestoneProgress.tsx` — Progress bar + 7 tier indicators
 
 **Pages (all 7 internal pages done):**
-- `/dashboard` — Wallet guard, full wallet address (click-to-copy with overlay animation), 4 stat cards (`border-[0.5px] border-white/60 bg-[#111111]`, portfolio value with AVAX logo SVG, credits held, CO2 offset, governance tokens w/ milestone bar), 3 tabs (Holdings, Retired, History) with `LoadingBar` wrapper. StatsRow uses `useRef` to prevent re-rendering skeletons on tab switch.
-- `/marketplace` — YouTube-style filters (horizontal pills) + credit count (right-aligned) + sorted credit grid. Search bar is in TopBar (not on page).
-- `/marketplace/[creditId]` — Credit detail + TradePanel + ChallengeButton + RetireButton
+- `/dashboard` — Wallet guard, full wallet address (click-to-copy with overlay animation), 4 stat cards (`border-[0.5px] border-white/60 bg-[#111111]`, portfolio value with `<AvaxLogo />`, credits held, CO2 offset, governance tokens w/ milestone bar), 3 tabs (Holdings, Retired, History) with `LoadingBar` wrapper. All AVAX amounts use `<AvaxLogo />` instead of text. StatsRow uses `useRef` to prevent re-rendering skeletons on tab switch.
+- `/marketplace` — YouTube-style filters (horizontal pills, `sticky top-[80px] z-30 bg-background` — stays below fixed TopBar on scroll) + credit count (right-aligned) + sorted credit grid. Search bar is in TopBar (not on page).
+- `/marketplace/[creditId]` — 2-column layout. Left: Back button (card style) + title with badges inline + 6 InfoRow cards (Total Supply, Tonnes CO2e, Credit ID, Vintage Year, Impact Score (AI Generated), Registry) + Your Holdings (`font-mono` number + retire inline). Right: Challenge button (card style, aligned with Back) + Issuer (full address, click-to-copy, break-all) + TradePanel (flex-1, all values `font-mono`, bottom aligns with Your Holdings). All cards use same `border-[0.5px] border-white/60 bg-[#111111]` style.
 - `/create` — Dual-path form (Certified/Community) with all fields + tx submission
 - `/governance` — Proposals list with ProposalCard (type badge, status, vote bar)
 - `/governance/[proposalId]` — Proposal detail with vote FOR/AGAINST buttons
@@ -290,10 +294,11 @@ Pattern: scan events with `getLogs` → collect IDs → `readContract` per ID (n
 
 ## Design System — Monochrome
 
-- **Color palette:** Full monochrome (white/black/zinc). NO emerald/green anywhere. Blue kept for Community badges and "Listed" trade type only.
-- **Card style:** `border-[0.5px] border-white/60 bg-[#111111]` — thin white border, dark fill (not as dark as page background)
+- **Color palette:** Mostly monochrome (white/black/zinc) with accent colors. AVAX red `#E84142` for branding (marquee sandwich bars). Teal for Certified badges. Blue for Community badges and "Listed" trade type.
+- **AVAX branding:** All "AVAX" text replaced by `<AvaxLogo />` SVG component (`src/components/common/AvaxLogo.tsx`). Red circle + white triangle, `size` prop, `align-middle` for vertical centering.
+- **Card style:** `border-[0.5px] border-white/60 bg-[#111111]` — thin white border, dark fill (not as dark as page background). Used consistently for ALL cards, info boxes, and Back/Challenge buttons.
 - **Buttons:** `border border-white/80 bg-white/5 backdrop-blur-sm` (glass effect), no hover color changes
-- **Badges:** `bg-white/10 text-white/80 border-white/20` (monochrome) or contextual (blue for Community, red for errors, yellow for pending)
+- **Badges:** Certified: `bg-teal-500/15 text-teal-400 border-teal-500/30` (turquoise). Community: `bg-blue-500/15 text-blue-400 border-blue-500/30` (blue). Contextual: red for errors, yellow for pending.
 - **Loading:** `LoadingBar` component wraps content, progress bar synced with real loading state (steps: 0→40%→65%→77%→85%, then →100% when data arrives, content revealed after 400ms)
 - **Copy animation:** Solid `bg-zinc-900` rounded overlay on `absolute inset-0` with checkmark + "Copied" text, fade-in 200ms
 

@@ -62,19 +62,7 @@ function CustomConnectButton() {
         }
 
         return (
-          <div className="flex items-center gap-3">
-            <Link
-              href="/create"
-              className="group relative flex h-12 w-12 items-center justify-center rounded-full border border-white/80 bg-white/5 text-white backdrop-blur-sm transition-all duration-200 "
-            >
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                <path d="M12 4v16M4 12h16" />
-              </svg>
-              <span className="pointer-events-none absolute -bottom-9 left-1/2 -translate-x-1/2 rounded-md bg-white px-2.5 py-1 text-[10px] uppercase tracking-widest text-background opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                Create
-              </span>
-            </Link>
-            <button
+          <button
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
               onClick={() => disconnect()}
@@ -86,7 +74,7 @@ function CustomConnectButton() {
                   <img
                     src={connector.icon}
                     alt={connector.name}
-                    className="h-7 w-7 rounded-full"
+                    className="h-8 w-8 rounded-full"
                   />
                 ) : (
                   <span className="text-base text-white">
@@ -100,8 +88,7 @@ function CustomConnectButton() {
               >
                 Disconnect
               </span>
-            </button>
-          </div>
+          </button>
         )
       }}
     </ConnectButton.Custom>

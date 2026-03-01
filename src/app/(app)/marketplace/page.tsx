@@ -163,13 +163,15 @@ export default function MarketplacePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <div className="flex-1 overflow-hidden">
-          <CreditFilters />
+      <div className="sticky top-[80px] z-30 -mx-6 bg-background px-6 py-3">
+        <div className="flex items-center gap-4">
+          <div className="flex-1 overflow-hidden">
+            <CreditFilters />
+          </div>
+          <span className="shrink-0 text-sm text-white/40">
+            {filtered.length} credit{filtered.length !== 1 ? "s" : ""}
+          </span>
         </div>
-        <span className="shrink-0 text-sm text-white/40">
-          {filtered.length} credit{filtered.length !== 1 ? "s" : ""}
-        </span>
       </div>
 
       {filtered.length === 0 ? (

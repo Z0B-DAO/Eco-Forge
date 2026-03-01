@@ -3,7 +3,7 @@ import { CreditOrigin } from "@/types"
 const ORIGIN_CONFIG = {
   [CreditOrigin.Certified]: {
     label: "Certified",
-    className: "bg-white/10 text-white/80 border-white/20",
+    className: "bg-teal-500/15 text-teal-400 border-teal-500/30",
   },
   [CreditOrigin.CommunityVerified]: {
     label: "Community",
