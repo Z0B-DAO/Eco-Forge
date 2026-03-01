@@ -98,7 +98,7 @@ The Anthropic API key is NEVER exposed client-side.
 
 ### Done (Step 2 — Layout + Common Components)
 - `src/components/layout/Header.tsx` — Exports `TopBar` (YouTube-style: hamburger + logo + search + wallet)
-- `src/components/layout/Footer.tsx` — Marquee sandwich footer (orange 3px + white marquee + orange 3px), `fixed bottom-0 z-[55] pointer-events-none`. Exports `FOOTER_H` (28px). Same marquee as landing page.
+- `src/components/layout/Footer.tsx` — White marquee band footer (no orange bars), `fixed bottom-0 z-[55] pointer-events-none`. Exports `FOOTER_H` (28px).
 - `src/components/layout/Sidebar.tsx` — Drawer sidebar (5 nav items with SVG icons, opens on hamburger click)
 - `src/components/web3/NetworkGuard.tsx` — Chain check + switch button
 - `src/components/web3/TxStatus.tsx` — Transaction status toast
@@ -141,8 +141,7 @@ The Anthropic API key is NEVER exposed client-side.
 **Scroll-Driven Zoom (GSAP + Lenis):**
 - 700vh scroll spacer, hero pinned via ScrollTrigger
 - 3% delay → zoom 3-80% (camera z=2.8→0.1, ease-in quadratic)
-- UI overlay (title + orange/white/orange marquee sandwich) scales up with scroll → exits frame naturally (same 3-80% range)
-- **Marquee sandwich:** 3px `#E84142` orange bar on top + white marquee bar + 3px `#E84142` orange bar on bottom. Same sandwich in dezoom overlay.
+- UI overlay (title + white marquee band) scales up with scroll → exits frame naturally (same 3-80% range)
 - Launch App button: links to `/marketplace`. No hover effects. Opacity fade at 60-70% scroll, clickable at 65%. No scale.
 - 80-100%: dwell on button before pin releases
 - Scrollbar hidden, user-select none, scroll-to-top on reload
@@ -239,8 +238,8 @@ Pattern: scan events with `getLogs` → collect IDs → `readContract` per ID (n
 - **First page load (from landing):** Uses `"pre"` phase (positions everything off-screen with `duration: 0`, no `initial` prop — avoids strict-mode double-mount bugs). `hasInitialized` ref guards against duplicate setup. Sequence: pre → rAF → enter (1.2s) → settle (+1400ms) → idle (+2000ms). Timers created inside rAF with no cleanup (immune to strict-mode teardown).
 - **Scroll reset:** `useEffect([pathname])` forces `scrollTo(0,0)` at 0ms, 50ms, 150ms (handles GSAP/Lenis scroll residue from landing page).
 - Blob visible as ambient background on ALL pages (shared instance in root layout, fixed, z-0)
-- Parent container: `overflow-hidden` during animation, `overflow-x-hidden` at rest
-- **Fixed header + footer layout:** TopBar `fixed top-0 z-[60]`, Footer `fixed bottom-0 z-[55]`. Content wrapper has `paddingTop: TOPBAR_H` (80px) + `paddingBottom: FOOTER_H` (28px) on main. Content `minHeight: calc(100vh - 80px)` — no scroll when content fits, normal scroll when it overflows (header + footer always visible).
+- Parent container: `h-screen overflow-hidden` (viewport-locked, no page scroll)
+- **Fixed header + footer layout:** TopBar `fixed top-0 z-[60]`, Footer `fixed bottom-0 z-[55]`. Content wrapper has `paddingTop: TOPBAR_H` (80px) + `paddingBottom: FOOTER_H` (28px) on main. `<main>` has `flex-1 min-h-0` — critical for nested flex scroll containers to work. Each page manages its own internal scroll via `flex h-full flex-col` + `flex-1 min-h-0 overflow-y-auto`.
 
 **Dezoom animation (Exit/Disconnect → Landing Page):**
 - Triggered by: clicking Exit link (`href="/"`) in sidebar OR Disconnect button (dispatches `ecoforge:exit` custom event)
@@ -250,18 +249,18 @@ Pattern: scan events with `getLogs` → collect IDs → `readContract` per ID (n
   1. `delete window.__blobTargetZ` → frees camera from 0.1 lock
   2. `window.__blobDezoom = { active: true, onComplete: () => router.push("/") }` → BlobScene lerps camera z from 0.1 → 2.8 (speed 3.5x, ~1.2s)
   3. UI wrapper: `opacity: 0` (CSS transition 1s) + `pointerEvents: none` → app UI fades out
-  4. Dezoom overlay appears: title "EcoForge" + orange/white/orange marquee sandwich bar, scaled inversely with dezoom progress. Formula: `scale = 1 + (1-progress)² × 8` (same as landing page zoom but reversed). At start: scale(9) (off-screen). At end: scale(1) (normal position). rAF loop reads `window.__blobDezoomProgress` and updates overlay transform.
+  4. Dezoom overlay appears: title "EcoForge" + white marquee band, scaled inversely with dezoom progress. Formula: `scale = 1 + (1-progress)² × 8` (same as landing page zoom but reversed). At start: scale(9) (off-screen). At end: scale(1) (normal position). rAF loop reads `window.__blobDezoomProgress` and updates overlay transform.
   5. Camera reaches 2.75 → `onComplete()` → `router.push("/")` → landing page mounts with scroll zoom ready
 - **Zero flash:** shared blob Canvas never unmounts. Title + marquee enter the frame smoothly during dezoom.
 - Sidebar auto-closes when dezoom starts
-- Footer is outside the dezoom opacity wrapper — always visible during dezoom (dezoom overlay has its own marquee at z-[70] above)
+- Footer hidden during dezoom (`{!dezooming && <Footer />}`) — dezoom overlay has its own marquee at z-[70]
 
 **Card-style page layout:**
 - Content wrapped in bordered card: `border border-white rounded-t-2xl border-b-0` (white border, rounded top corners, no bottom border)
 - TopBar also bordered: `border border-white rounded-2xl`
 - Content starts below fixed TopBar via `paddingTop: TOPBAR_H` on parent div, connected with `-mt-px`
 - Border width matches button borders (1px) for visual consistency
-- **Footer:** Marquee sandwich `fixed bottom-0 z-[55]`, always visible on all app pages. `pointer-events-none`. Content has `paddingBottom: FOOTER_H` so last elements aren't hidden behind footer.
+- **Footer:** White marquee band `fixed bottom-0 z-[55]`, always visible on all app pages (hidden during dezoom). `pointer-events-none`. Content has `paddingBottom: FOOTER_H` so last elements aren't hidden behind footer.
 
 **Credit components:**
 - `src/components/credits/CreditCard.tsx` — Card: project name (left) + origin badge (right) on top row, projectType/region, tonnes + price. `border-[0.5px] border-white/60 bg-[#111111]`. No hover effects.
@@ -279,14 +278,14 @@ Pattern: scan events with `getLogs` → collect IDs → `readContract` per ID (n
 - `src/components/rewards/TokenBalance.tsx` — Governance token balance + % supply
 - `src/components/rewards/MilestoneProgress.tsx` — Progress bar + 7 tier indicators
 
-**Pages (all 7 internal pages done):**
-- `/dashboard` — Wallet guard, full wallet address (click-to-copy with overlay animation), 4 stat cards (`border-[0.5px] border-white/60 bg-[#111111]`, portfolio value with `<AvaxLogo />`, credits held, CO2 offset, governance tokens w/ milestone bar), 3 tabs (Holdings, Retired, History) with `LoadingBar` wrapper. All AVAX amounts use `<AvaxLogo />` instead of text. StatsRow uses `useRef` to prevent re-rendering skeletons on tab switch.
-- `/marketplace` — YouTube-style filters (horizontal pills, `sticky top-[80px] z-30 bg-background` — stays below fixed TopBar on scroll) + credit count (right-aligned) + sorted credit grid. Search bar is in TopBar (not on page).
+**Pages (all 7 internal pages done — all use scroll pattern: `flex h-full flex-col` + `shrink-0` header + `flex-1 min-h-0 overflow-y-auto` content):**
+- `/dashboard` — Wallet guard, full wallet address (click-to-copy with overlay animation), 4 stat cards (`border-[0.5px] border-white/60 bg-[#111111]`, portfolio value with `<AvaxLogo />`, credits held, CO2 offset, governance tokens w/ milestone bar + orange `bg-[#f97316]` progress bar tier-aligned: `((currentTier + progressInTier) / totalTiers) * 100`%), 3 tabs (Holdings, Retired, History) with `LoadingBar` wrapper. Holdings table: split thead/tbody (two `<table>` elements — fixed header, scrollable body). All AVAX amounts use `<AvaxLogo />`. StatsRow uses `useRef` to prevent re-rendering skeletons on tab switch.
+- `/marketplace` — YouTube-style filters (horizontal pills) fixed at top + credit count (right-aligned) + sorted credit grid scrolls below. Search bar is in TopBar (not on page).
 - `/marketplace/[creditId]` — 2-column layout. Left: Back button (card style) + title with badges inline + 6 InfoRow cards (Total Supply, Tonnes CO2e, Credit ID, Vintage Year, Impact Score (AI Generated), Registry) + Your Holdings (`font-mono` number + retire inline). Right: Challenge button (card style, aligned with Back) + Issuer (full address, click-to-copy, break-all) + TradePanel (flex-1, all values `font-mono`, bottom aligns with Your Holdings). All cards use same `border-[0.5px] border-white/60 bg-[#111111]` style.
-- `/create` — Dual-path form (Certified/Community) with all fields + tx submission
-- `/governance` — Proposals list with ProposalCard (type badge, status, vote bar)
-- `/governance/[proposalId]` — Proposal detail with vote FOR/AGAINST buttons
-- `/governance/disputes` — Disputes list + challenge submission form (stake-to-dispute)
+- `/create` — Dual-path form (Certified/Community) with all fields + tx submission. All cards `border-[0.5px] border-white/60 bg-[#111111]`.
+- `/governance` — Proposals list with ProposalCard (type badge, status, vote bar). "View Disputes" button card style (`rounded-xl border-[0.5px] border-white/60 bg-[#111111]`). Fixed header, scrollable list.
+- `/governance/[proposalId]` — Back button (card style with arrow SVG, same as marketplace), click-to-copy proposer address (full, with "Copied" overlay), description card, `CreditCard` for contested credit (fetched via `DisputeRaised` event logs matching `autoProposalId` — links to `/marketplace/[id]`), vote bar, vote FOR/AGAINST buttons, "You have already voted" banner. Scrollable (`h-full overflow-y-auto`). All sections `border-[0.5px] border-white/60 bg-[#111111]`.
+- `/governance/disputes` — Disputes list + challenge submission form (stake-to-dispute). Credit ID input: `min="1"` + positive integer validation. "← Proposals" button card style. Fixed header + form, scrollable disputes list.
 
 ### TODO (Steps 7-8)
 - Step 7: Server Actions (generateImpactScore, analyzeDispute) — mocked
@@ -294,13 +293,15 @@ Pattern: scan events with `getLogs` → collect IDs → `readContract` per ID (n
 
 ## Design System — Monochrome
 
-- **Color palette:** Mostly monochrome (white/black/zinc) with accent colors. AVAX red `#E84142` for branding (marquee sandwich bars). Teal for Certified badges. Blue for Community badges and "Listed" trade type.
+- **Color palette:** Mostly monochrome (white/black/zinc) with accent colors. AVAX red `#E84142` for branding. Orange `#f97316` for milestone progress bar. Teal for Certified badges. Blue for Community badges and "Listed" trade type.
 - **AVAX branding:** All "AVAX" text replaced by `<AvaxLogo />` SVG component (`src/components/common/AvaxLogo.tsx`). Red circle + white triangle, `size` prop, `align-middle` for vertical centering.
 - **Card style:** `border-[0.5px] border-white/60 bg-[#111111]` — thin white border, dark fill (not as dark as page background). Used consistently for ALL cards, info boxes, and Back/Challenge buttons.
 - **Buttons:** `border border-white/80 bg-white/5 backdrop-blur-sm` (glass effect), no hover color changes
 - **Badges:** Certified: `bg-teal-500/15 text-teal-400 border-teal-500/30` (turquoise). Community: `bg-blue-500/15 text-blue-400 border-blue-500/30` (blue). Contextual: red for errors, yellow for pending.
 - **Loading:** `LoadingBar` component wraps content, progress bar synced with real loading state (steps: 0→40%→65%→77%→85%, then →100% when data arrives, content revealed after 400ms)
 - **Copy animation:** Solid `bg-zinc-900` rounded overlay on `absolute inset-0` with checkmark + "Copied" text, fade-in 200ms
+- **Scroll layout pattern:** All pages use `flex h-full flex-col` with `shrink-0` fixed header/filters and `flex-1 min-h-0 overflow-y-auto` scrollable content. `<main>` in app layout has `min-h-0` to allow nested flex overflow. For tables with fixed headers: two separate `<table>` elements (thead in fixed area, tbody in scrollable div).
+- **Marquee:** White band only (no orange bars). Used in Footer, landing page overlay, and dezoom overlay.
 
 ## Key Conventions
 
