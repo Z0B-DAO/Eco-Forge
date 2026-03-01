@@ -114,9 +114,9 @@ export default function CreatePage() {
         <div className="grid gap-4 md:grid-cols-2">
           <button
             onClick={() => setPath("certified")}
-            className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-left transition-all hover:border-emerald-500/40 hover:bg-zinc-800/80"
+            className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-left transition-all hover:border-white/40 hover:bg-zinc-800/80"
           >
-            <div className="inline-flex rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-400">
+            <div className="inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/80">
               Certified
             </div>
             <h3 className="mt-3 text-lg font-semibold text-zinc-100">Bridge from Registry</h3>
@@ -221,7 +221,7 @@ export default function CreatePage() {
       <button
         onClick={handleSubmit}
         disabled={isPending || receipt.isPending}
-        className="w-full rounded-lg bg-emerald-600 py-3 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full rounded-lg border border-white/80 bg-white/5 backdrop-blur-sm py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isPending ? "Confirm in wallet..." : receipt.isPending ? "Confirming..." : receipt.isSuccess ? "Credit created!" : "Create Credit"}
       </button>

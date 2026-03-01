@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useDispute } from "@/hooks/useDispute"
 import { useGovernanceToken } from "@/hooks/useGovernanceToken"
 import { CONTRACT_ADDRESSES, GOVERNANCE_ABI, CARBON_CREDIT_ABI } from "@/services/web3/contracts"
-import { LoadingSpinner } from "@/components/common/LoadingSpinner"
+import { LoadingBar } from "@/components/common/LoadingSpinner"
 import { EmptyState } from "@/components/common/EmptyState"
 import { CreditStatusBadge } from "@/components/credits/CreditStatusBadge"
 import { DisputeStatus } from "@/types"
@@ -94,17 +94,17 @@ export default function DisputesPage() {
 
       <SubmitDisputePanel />
 
-      {isLoading ? (
-        <div className="flex justify-center py-20"><LoadingSpinner size="lg" /></div>
-      ) : !disputes || disputes.length === 0 ? (
-        <EmptyState title="No disputes yet" description="When a credit is challenged, the dispute appears here with a linked DAO proposal." />
-      ) : (
-        <div className="space-y-3">
-          {disputes.map((d) => (
-            <DisputeCard key={d.disputeIndex} data={d} />
-          ))}
-        </div>
-      )}
+      <LoadingBar isLoading={isLoading}>
+        {!disputes || disputes.length === 0 ? (
+          <EmptyState title="No disputes yet" description="When a credit is challenged, the dispute appears here with a linked DAO proposal." />
+        ) : (
+          <div className="space-y-3">
+            {disputes.map((d) => (
+              <DisputeCard key={d.disputeIndex} data={d} />
+            ))}
+          </div>
+        )}
+      </LoadingBar>
     </div>
   )
 }
@@ -169,7 +169,7 @@ function SubmitDisputePanel() {
           >
             {isPending ? "Confirm in wallet..." : isConfirming ? "Confirming..." : "Submit Dispute"}
           </button>
-          {isConfirmed && <p className="text-sm text-emerald-400">Dispute submitted! A DAO proposal has been created automatically.</p>}
+          {isConfirmed && <p className="text-sm text-white">Dispute submitted! A DAO proposal has been created automatically.</p>}
           {error && <p className="text-sm text-red-400">{error.message}</p>}
         </div>
       )}
@@ -189,7 +189,7 @@ function DisputeCard({ data }: { data: DisputeWithCredit }) {
   const statusStyle = dispute.status === DisputeStatus.Open
     ? "bg-yellow-500/15 text-yellow-400"
     : dispute.status === DisputeStatus.Resolved
-      ? "bg-emerald-500/15 text-emerald-400"
+      ? "bg-white/10 text-white"
       : "bg-red-500/15 text-red-400"
 
   return (
@@ -204,7 +204,7 @@ function DisputeCard({ data }: { data: DisputeWithCredit }) {
         {autoProposalId !== undefined && (
           <Link
             href={`/governance/${autoProposalId}`}
-            className="text-xs text-emerald-400 hover:text-emerald-300"
+            className="text-xs text-white hover:text-zinc-300"
           >
             View Proposal →
           </Link>

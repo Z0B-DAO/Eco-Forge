@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useProposals } from "@/hooks/useProposals"
-import { LoadingSpinner } from "@/components/common/LoadingSpinner"
+import { LoadingBar } from "@/components/common/LoadingSpinner"
 import { EmptyState } from "@/components/common/EmptyState"
 import { ProposalType } from "@/types"
 import { timeFromNow, percentage } from "@/lib/utils"
@@ -26,17 +26,17 @@ export default function GovernancePage() {
         </Link>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-20"><LoadingSpinner size="lg" /></div>
-      ) : !proposals || proposals.length === 0 ? (
-        <EmptyState title="No proposals yet" description="Proposals are created when credits are disputed or governance changes are proposed." />
-      ) : (
-        <div className="space-y-3">
-          {proposals.map((p: Proposal) => (
-            <ProposalCard key={p.id.toString()} proposal={p} />
-          ))}
-        </div>
-      )}
+      <LoadingBar isLoading={isLoading}>
+        {!proposals || proposals.length === 0 ? (
+          <EmptyState title="No proposals yet" description="Proposals are created when credits are disputed or governance changes are proposed." />
+        ) : (
+          <div className="space-y-3">
+            {proposals.map((p: Proposal) => (
+              <ProposalCard key={p.id.toString()} proposal={p} />
+            ))}
+          </div>
+        )}
+      </LoadingBar>
     </div>
   )
 }
@@ -64,7 +64,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
             proposal.executed
               ? "bg-zinc-500/15 text-zinc-400"
               : isActive
-                ? "bg-emerald-500/15 text-emerald-400"
+                ? "bg-white/10 text-white"
                 : "bg-yellow-500/15 text-yellow-400"
           }`}>
             {proposal.executed ? "Executed" : isActive ? "Active" : "Ended"}
@@ -81,7 +81,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
           <span>AGAINST {100 - forPct}%</span>
         </div>
         <div className="mt-1 flex h-2 overflow-hidden rounded-full bg-zinc-800">
-          <div className="bg-emerald-500 transition-all" style={{ width: `${forPct}%` }} />
+          <div className="bg-white transition-all" style={{ width: `${forPct}%` }} />
           <div className="bg-red-500 transition-all" style={{ width: `${100 - forPct}%` }} />
         </div>
         <p className="mt-1 text-xs text-zinc-500">{Number(totalVotes)} total votes</p>

@@ -61,7 +61,7 @@ export function CreditFilters() {
               className={`shrink-0 cursor-pointer rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 isActive(item)
                   ? "bg-white text-background"
-                  : "bg-white/10 text-white hover:bg-white/40"
+                  : "bg-white/10 text-white"
               }`}
             >
               {item.label}
@@ -74,7 +74,7 @@ export function CreditFilters() {
           <div className="h-6 w-px shrink-0 bg-white/40" />
           <button
             onClick={resetFilters}
-            className="shrink-0 cursor-pointer px-2 text-sm text-white/40 transition-colors hover:text-white"
+            className="shrink-0 cursor-pointer px-2 text-sm text-white/40"
           >
             ✕
           </button>

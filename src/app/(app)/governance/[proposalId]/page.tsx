@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useVote } from "@/hooks/useVote"
 import { useGovernanceToken } from "@/hooks/useGovernanceToken"
 import { CONTRACT_ADDRESSES, GOVERNANCE_ABI } from "@/services/web3/contracts"
-import { LoadingSpinner } from "@/components/common/LoadingSpinner"
+import { LoadingBar } from "@/components/common/LoadingSpinner"
 import { ProposalType } from "@/types"
 import type { Proposal } from "@/types"
 import { timeFromNow, percentage, truncateAddress } from "@/lib/utils"
@@ -33,10 +33,23 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ propo
   const { vote, isPending, isConfirming, isConfirmed, error } = useVote()
   const { balance } = useGovernanceToken()
 
-  if (isLoading) {
-    return <div className="flex justify-center py-20"><LoadingSpinner size="lg" /></div>
-  }
+  return (
+    <LoadingBar isLoading={isLoading}>
+      <ProposalContent proposal={proposal} proposalId={proposalId} vote={vote} isPending={isPending} isConfirming={isConfirming} isConfirmed={isConfirmed} error={error} balance={balance} />
+    </LoadingBar>
+  )
+}
 
+function ProposalContent({ proposal, proposalId, vote, isPending, isConfirming, isConfirmed, error, balance }: {
+  proposal: Proposal | undefined
+  proposalId: bigint
+  vote: (id: bigint, support: boolean) => void
+  isPending: boolean
+  isConfirming: boolean
+  isConfirmed: boolean
+  error: Error | null
+  balance: bigint | undefined
+}) {
   if (!proposal) {
     return <p className="py-20 text-center text-zinc-400">Proposal not found.</p>
   }
@@ -60,7 +73,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ propo
           <span className={`rounded px-2 py-0.5 text-xs font-medium ${
             proposal.executed
               ? "bg-zinc-500/15 text-zinc-400"
-              : isActive ? "bg-emerald-500/15 text-emerald-400" : "bg-yellow-500/15 text-yellow-400"
+              : isActive ? "bg-white/10 text-white" : "bg-yellow-500/15 text-yellow-400"
           }`}>
             {proposal.executed ? "Executed" : isActive ? "Active" : "Ended"}
           </span>
@@ -81,11 +94,11 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ propo
 
         <div className="mt-4 space-y-3">
           <div className="flex justify-between text-sm">
-            <span className="text-emerald-400">FOR — {Number(proposal.forVotes)} votes ({forPct}%)</span>
+            <span className="text-white">FOR — {Number(proposal.forVotes)} votes ({forPct}%)</span>
             <span className="text-red-400">AGAINST — {Number(proposal.againstVotes)} votes ({100 - forPct}%)</span>
           </div>
           <div className="flex h-3 overflow-hidden rounded-full bg-zinc-800">
-            <div className="bg-emerald-500 transition-all" style={{ width: `${forPct}%` }} />
+            <div className="bg-white transition-all" style={{ width: `${forPct}%` }} />
             <div className="bg-red-500 transition-all" style={{ width: `${100 - forPct}%` }} />
           </div>
         </div>
@@ -105,7 +118,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ propo
               <button
                 onClick={() => vote(proposalId, true)}
                 disabled={isPending || isConfirming}
-                className="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
+                className="flex-1 rounded-lg border border-white/80 bg-white/5 backdrop-blur-sm py-2.5 text-sm font-medium text-white disabled:opacity-50"
               >
                 {isPending || isConfirming ? "Voting..." : "Vote FOR"}
               </button>
@@ -119,7 +132,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ propo
             </div>
           )}
 
-          {isConfirmed && <p className="mt-3 text-sm text-emerald-400">Vote submitted!</p>}
+          {isConfirmed && <p className="mt-3 text-sm text-white">Vote submitted!</p>}
           {error && <p className="mt-3 text-sm text-red-400">{error.message}</p>}
         </div>
       )}

@@ -11,7 +11,9 @@ function CustomConnectButton() {
   const [expanded, setExpanded] = useState(false)
   const [wasConnected, setWasConnected] = useState(false)
   const { connector, isConnected } = useAccount()
-  const { disconnect } = useDisconnect()
+  const { disconnect } = useDisconnect({
+    mutation: { onSuccess: () => window.dispatchEvent(new Event("ecoforge:exit")) }
+  })
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
 
   useEffect(() => {
@@ -106,7 +108,7 @@ function CustomConnectButton() {
   )
 }
 
-export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
+export function TopBar({ onMenuClick, onMenuHover }: { onMenuClick: () => void; onMenuHover?: () => void }) {
   const pathname = usePathname()
   const { query, setQuery } = useMarketStore()
   const showSearch = pathname === "/marketplace"
@@ -116,7 +118,8 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
       <div className="flex shrink-0 items-center gap-4">
         <button
           onClick={onMenuClick}
-          className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/80 bg-white/5 text-white backdrop-blur-sm transition-all duration-200 "
+          onMouseEnter={onMenuHover}
+          className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full border border-white/80 bg-white/5 text-white backdrop-blur-sm transition-all duration-200 "
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M4 6h16M4 12h16M4 18h16" />

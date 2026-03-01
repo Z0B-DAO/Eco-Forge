@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { Providers } from "./providers";
+import SharedBlob from "@/components/layout/SharedBlob";
 import "./globals.css";
 
 const vipnagorgialla = localFont({
@@ -37,7 +38,10 @@ export default function RootLayout({
       <body
         className={`${vipnagorgialla.variable} ${satoshi.variable} antialiased`}
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          <SharedBlob />
+          {children}
+        </Providers>
       </body>
     </html>
   );

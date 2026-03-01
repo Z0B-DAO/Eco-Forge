@@ -2,14 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
 
 gsap.registerPlugin(ScrollTrigger);
-
-const Blob = dynamic(() => import("@/components/landing/Blob"), { ssr: false });
 
 const marqueeItems = [
   "Build on Avalanche",
@@ -193,25 +190,37 @@ export default function Home() {
         }
 
         if (launchBtnRef.current) {
-          const btnProgress = Math.min(1, Math.max(0, (self.progress - 0.55) / 0.15));
+          const btnProgress = Math.min(1, Math.max(0, (self.progress - 0.60) / 0.10));
           launchBtnRef.current.style.opacity = String(btnProgress);
-          launchBtnRef.current.style.pointerEvents = btnProgress > 0.5 ? "auto" : "none";
+          launchBtnRef.current.style.pointerEvents = self.progress >= 0.65 ? "auto" : "none";
         }
       },
     });
 
     return () => {
-      trigger.kill();
+      lenis.stop();
       lenis.destroy();
+      trigger.kill();
+      ScrollTrigger.getAll().forEach(t => t.kill());
+      ScrollTrigger.clearScrollMemory();
+      ScrollTrigger.refresh();
+      gsap.ticker.remove(lenis.raf);
+      // Remove any GSAP pin-spacer leftovers
+      document.querySelectorAll(".pin-spacer").forEach(el => {
+        const child = el.firstElementChild;
+        if (child) el.parentNode?.replaceChild(child, el);
+        else el.remove();
+      });
+      window.history.scrollRestoration = "auto";
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
       delete (window as unknown as Record<string, unknown>).__scrollProgress;
     };
   }, []);
 
   return (
     <div>
-      {/* 3D Blob — fixed background behind everything */}
-      <Blob />
-
       {/* Scroll spacer — 7x viewport for the zoom sequence */}
       <div ref={heroRef} className="relative h-[700vh]">
         {/* Pinned hero content */}
@@ -227,14 +236,18 @@ export default function Home() {
             </div>
 
             {/* Bottom marquee banner */}
-            <div className="w-full overflow-hidden bg-white py-0.5">
-              <div
-                className="flex whitespace-nowrap text-xs uppercase tracking-wider text-background md:text-sm"
-                style={{ animation: "marquee 20s linear infinite" }}
-              >
-                <span className="flex shrink-0 items-center"><MarqueeContent /></span>
-                <span className="flex shrink-0 items-center"><MarqueeContent /></span>
+            <div className="w-full">
+              <div className="h-[3px] w-full" style={{ background: "#E84142" }} />
+              <div className="overflow-hidden bg-white py-0.5">
+                <div
+                  className="flex whitespace-nowrap text-xs uppercase tracking-wider text-background md:text-sm"
+                  style={{ animation: "marquee 20s linear infinite" }}
+                >
+                  <span className="flex shrink-0 items-center"><MarqueeContent /></span>
+                  <span className="flex shrink-0 items-center"><MarqueeContent /></span>
+                </div>
               </div>
+              <div className="h-[3px] w-full" style={{ background: "#E84142" }} />
             </div>
           </div>
 
@@ -244,7 +257,7 @@ export default function Home() {
             className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"
             style={{ opacity: 0 }}
           >
-            <Link href="/marketplace" className="rounded-full border border-white/80 bg-white/5 px-10 py-4 text-lg tracking-wide text-white backdrop-blur-sm transition-all hover:bg-white/10 hover:shadow-[0_0_30px_rgba(255,255,255,0.15)]">
+            <Link href="/marketplace" className="rounded-full border border-white/80 bg-white/5 px-10 py-4 text-lg tracking-wide text-white backdrop-blur-sm">
               Launch App
             </Link>
           </div>

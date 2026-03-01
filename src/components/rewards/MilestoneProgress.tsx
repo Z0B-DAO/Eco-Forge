@@ -29,7 +29,7 @@ export function MilestoneProgress() {
           {nextMilestone && <span className="text-zinc-500"> / {targetActions} actions</span>}
         </p>
         {nextMilestone ? (
-          <span className="text-sm text-emerald-400">+{reward} tokens</span>
+          <span className="text-sm text-white">+{reward} tokens</span>
         ) : (
           <span className="text-sm text-zinc-500">All tiers reached</span>
         )}
@@ -37,7 +37,7 @@ export function MilestoneProgress() {
 
       <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-800">
         <div
-          className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+          className="h-full rounded-full bg-whitetransition-all duration-500"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -48,9 +48,9 @@ export function MilestoneProgress() {
             key={i}
             className={`flex-1 rounded py-1 text-center text-xs font-medium ${
               i < currentTier
-                ? "bg-emerald-500/20 text-emerald-400"
+                ? "bg-white/20 text-white"
                 : i === currentTier
-                  ? "border border-emerald-500/40 text-emerald-400"
+                  ? "border border-white/40 text-white"
                   : "bg-zinc-800 text-zinc-500"
             }`}
           >

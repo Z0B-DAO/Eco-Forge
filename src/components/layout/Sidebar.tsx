@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { motion } from "framer-motion"
 
 const NAV_ITEMS = [
   {
@@ -45,68 +46,68 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    href: "/",
+    label: "Exit",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+        <polyline points="16 17 21 12 16 7" />
+        <line x1="21" y1="12" x2="9" y2="12" />
+      </svg>
+    ),
+  },
 ]
 
-export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+export const SIDEBAR_COLLAPSED = 66
+export const SIDEBAR_EXPANDED = 260
+
+export function Sidebar({ open, onOpen, onClose, hiding }: { open: boolean; onOpen: () => void; onClose: () => void; hiding?: boolean }) {
   const pathname = usePathname()
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 ${
-          open ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
-        onClick={onClose}
-      />
+    <motion.aside
+      onMouseEnter={onOpen}
+      onMouseLeave={onClose}
+      className="fixed left-0 top-0 z-50 flex h-screen flex-col transition-[width] duration-300 ease-out"
+      style={{ width: open ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED }}
+      initial={false}
+      animate={{ x: hiding ? "-100%" : 0 }}
+      transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+    >
+      <div className="h-[82px] pointer-events-none" />
 
-      {/* Drawer */}
-      <aside
-        className={`fixed left-0 top-0 z-50 flex h-screen w-[240px] flex-col bg-background border-r border-[#1E1E1E] transition-transform duration-300 ease-out ${
-          open ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        {/* Header row with hamburger + logo */}
-        <div className="flex h-16 items-center gap-4 px-4">
-          <button
-            onClick={onClose}
-            className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-white transition-colors hover:bg-white/10"
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <span className="font-display text-2xl font-bold tracking-wider text-white">
-            EcoForge
-          </span>
-        </div>
+      <nav className="flex flex-1 flex-col gap-2 border border-white rounded-t-2xl border-b-0 bg-background -mt-px p-2">
+        {NAV_ITEMS.map((item) => {
+          const isActive =
+            item.href === "/create" || item.href === "/"
+              ? pathname === item.href
+              : pathname.startsWith(item.href)
 
-        {/* Nav items */}
-        <nav className="mt-2 flex flex-col gap-1 px-2">
-          {NAV_ITEMS.map((item) => {
-            const isActive =
-              item.href === "/create"
-                ? pathname === "/create"
-                : pathname.startsWith(item.href)
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onClose}
-                className={`flex items-center gap-4 rounded-xl px-3 py-3 transition-colors ${
-                  isActive
-                    ? "bg-white/5 text-white"
-                    : "text-white/40 hover:text-white/70"
-                }`}
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onClose}
+              className={`relative flex h-12 w-full items-center rounded-full border overflow-hidden backdrop-blur-sm transition-all duration-300 ease-out ${
+                isActive
+                  ? "border-white bg-white/10 text-white"
+                  : "border-white/80 bg-white/5 text-white/40 hover:text-white/70"
+              }`}
+            >
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center">
+                {item.icon}
+              </div>
+              <span
+                className="whitespace-nowrap text-xs uppercase tracking-widest text-current transition-opacity duration-300 pointer-events-none"
+                style={{ opacity: open ? 1 : 0 }}
               >
-                <span className="shrink-0">{item.icon}</span>
-                <span className="text-sm font-semibold">{item.label}</span>
-              </Link>
-            )
-          })}
-        </nav>
-      </aside>
-    </>
+                {item.label}
+              </span>
+            </Link>
+          )
+        })}
+      </nav>
+    </motion.aside>
   )
 }

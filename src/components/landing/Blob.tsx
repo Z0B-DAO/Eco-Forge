@@ -614,39 +614,54 @@ function StreakParticles({
 }
 
 // ─── Scene ───
-function BlobScene({ isStatic = false }: { isStatic?: boolean }) {
+function BlobScene() {
   const timeRef = useRef(0);
   const impulseRef = useRef(0);
   const clickTypeRef = useRef(0);
   const visibleLayerRef = useRef(0);
   const clickDirRef = useRef(new THREE.Vector3(0, 0, 1));
   const clickModeRef = useRef(1.0);
-  const formationRef = useRef(isStatic ? 1 : 0);
+  const formationRef = useRef(0);
   const { gl, camera } = useThree();
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const blobSphere = useMemo(() => new THREE.Sphere(new THREE.Vector3(0, 0, 0), 0.95), []);
 
-  const zoomDoneRef = useRef(isStatic);
+  const zoomDoneRef = useRef(false);
 
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1);
     timeRef.current = (timeRef.current + delta) % 10000;
 
-    if (!isStatic && formationRef.current < 0.999) {
+    if (formationRef.current < 0.999) {
       formationRef.current += (1.0 - formationRef.current) * 1.5 * delta;
     } else {
       formationRef.current = 1;
     }
 
-    if (!isStatic) {
-      const sp = (window as unknown as Record<string, { current: number }>).__scrollProgress;
-      if (sp) {
-        const raw = Math.min(1, Math.max(0, (sp.current - 0.03) / 0.77));
-        const progress = raw * raw;
-        camera.position.z = 2.8 - progress * 2.7;
-        zoomDoneRef.current = progress >= 1;
+    const win = window as any;
+    const sp = win.__scrollProgress;
+    const dezoom = win.__blobDezoom;
+    const targetZ = win.__blobTargetZ;
+
+    if (sp) {
+      const raw = Math.min(1, Math.max(0, (sp.current - 0.03) / 0.77));
+      const progress = raw * raw;
+      camera.position.z = 2.8 - progress * 2.7;
+      zoomDoneRef.current = progress >= 1;
+    } else if (dezoom?.active) {
+      camera.position.z += (2.8 - camera.position.z) * 3.5 * delta;
+      win.__blobDezoomProgress = Math.min(1, (camera.position.z - 0.1) / 2.7);
+      if (camera.position.z > 2.75) {
+        camera.position.z = 2.8;
+        dezoom.active = false;
+        zoomDoneRef.current = false;
+        win.__blobDezoomProgress = 1;
+        dezoom.onComplete?.();
       }
+    } else if (targetZ !== undefined) {
+      camera.position.z = targetZ;
+      zoomDoneRef.current = true;
     }
 
     impulseRef.current *= 0.978;
@@ -710,6 +725,7 @@ function BlobScene({ isStatic = false }: { isStatic?: boolean }) {
   return (
     <>
       <StreakParticles timeRef={timeRef} impulseRef={impulseRef} clickTypeRef={clickTypeRef} clickSeedRef={clickSeedRef} visibleLayerRef={visibleLayerRef} clickDirRef={clickDirRef} clickModeRef={clickModeRef} formationRef={formationRef} />
+      {/* DustCloud removed — kept only StreakParticles */}
 
       <EffectComposer>
         <Bloom
@@ -723,7 +739,7 @@ function BlobScene({ isStatic = false }: { isStatic?: boolean }) {
   );
 }
 
-export default function Blob({ cameraZ = 2.8 }: { cameraZ?: number } = {}) {
+export default function Blob() {
   const [ready, setReady] = useState(false);
 
   return (
@@ -732,12 +748,12 @@ export default function Blob({ cameraZ = 2.8 }: { cameraZ?: number } = {}) {
       style={{ opacity: ready ? 1 : 0 }}
     >
       <Canvas
-        camera={{ position: [0, 0, cameraZ], fov: 50 }}
+        camera={{ position: [0, 0, 2.8], fov: 50 }}
         gl={{ antialias: true, alpha: true }}
         dpr={[1, 2]}
         onCreated={() => requestAnimationFrame(() => requestAnimationFrame(() => setReady(true)))}
       >
-        <BlobScene isStatic={cameraZ !== 2.8} />
+        <BlobScene />
       </Canvas>
     </div>
   );

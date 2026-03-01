@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useBuyCredit } from "@/hooks/useBuyCredit"
 import { formatAvax, truncateAddress } from "@/lib/utils"
+import { AvaxLogo } from "@/components/common/AvaxLogo"
 import type { Listing } from "@/types"
 
 export function TradePanel({ listing }: { listing: Listing }) {
@@ -24,7 +25,7 @@ export function TradePanel({ listing }: { listing: Listing }) {
       <div className="mt-4 space-y-3">
         <div className="flex items-center justify-between text-sm">
           <span className="text-zinc-400">Price per unit</span>
-          <span className="font-medium text-zinc-100">{formatAvax(listing.pricePerUnit)} AVAX</span>
+          <span className="flex items-center gap-1 font-medium text-zinc-100">{formatAvax(listing.pricePerUnit)} <AvaxLogo size={14} /></span>
         </div>
         <div className="flex items-center justify-between text-sm">
           <span className="text-zinc-400">Available</span>
@@ -50,13 +51,13 @@ export function TradePanel({ listing }: { listing: Listing }) {
 
       <div className="mt-3 flex items-center justify-between text-sm">
         <span className="text-zinc-400">Total</span>
-        <span className="text-lg font-semibold text-emerald-400">{formatAvax(totalPrice)} AVAX</span>
+        <span className="flex items-center gap-1 text-lg font-semibold text-white">{formatAvax(totalPrice)} <AvaxLogo size={16} /></span>
       </div>
 
       <button
         onClick={handleBuy}
         disabled={isPending || isConfirming || amount <= 0}
-        className="mt-4 w-full rounded-lg bg-emerald-600 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-4 w-full rounded-lg border border-white/80 bg-white/5 backdrop-blur-sm py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isPending ? "Confirm in wallet..." : isConfirming ? "Confirming..." : isConfirmed ? "Purchased!" : "Buy Credits"}
       </button>

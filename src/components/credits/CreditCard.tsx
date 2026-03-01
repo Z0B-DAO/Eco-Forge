@@ -2,6 +2,7 @@ import Link from "next/link"
 import { CreditOriginBadge } from "./CreditOriginBadge"
 
 import { formatAvax } from "@/lib/utils"
+import { AvaxLogo } from "@/components/common/AvaxLogo"
 import type { CreditType, Listing } from "@/types"
 
 interface CreditCardProps {
@@ -13,7 +14,7 @@ export function CreditCard({ credit, listing }: CreditCardProps) {
   return (
     <Link
       href={`/marketplace/${credit.id}`}
-      className="flex flex-col rounded-xl border border-zinc-800 bg-zinc-900 p-5"
+      className="flex flex-col rounded-xl border-[0.5px] border-white/60 bg-[#111111] p-5 no-underline hover:no-underline"
     >
       <div className="flex items-center justify-between">
         <h3 className="text-base font-semibold text-zinc-100">
@@ -33,8 +34,8 @@ export function CreditCard({ credit, listing }: CreditCardProps) {
           <span className="text-zinc-100 font-medium">{Number(credit.tonnesCO2e)}</span> tCO2e
         </div>
         {listing && (
-          <div className="text-sm font-medium text-emerald-400">
-            {formatAvax(listing.pricePerUnit)} AVAX
+          <div className="text-sm font-medium text-white">
+            {formatAvax(listing.pricePerUnit)} <AvaxLogo size={14} />
           </div>
         )}
       </div>
