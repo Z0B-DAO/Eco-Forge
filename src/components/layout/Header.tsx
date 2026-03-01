@@ -1,81 +1,47 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ConnectButton } from "@rainbow-me/rainbowkit"
-import { useDisconnect } from "wagmi"
-
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/marketplace", label: "Marketplace" },
-  { href: "/create", label: "Create" },
-  { href: "/governance", label: "Governance" },
-  { href: "/portfolio", label: "Portfolio" },
-]
-
-function AccountDropdown({ address, displayName, onClose }: { address: string; displayName: string; onClose: () => void }) {
-  const { disconnect } = useDisconnect()
-  const ref = useRef<HTMLDivElement>(null)
-  const [copied, setCopied] = useState(false)
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
-    }
-    function handleEsc(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose()
-    }
-    document.addEventListener("mousedown", handleClick)
-    document.addEventListener("keydown", handleEsc)
-    return () => {
-      document.removeEventListener("mousedown", handleClick)
-      document.removeEventListener("keydown", handleEsc)
-    }
-  }, [onClose])
-
-  const copyAddress = () => {
-    navigator.clipboard.writeText(address)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
-  }
-
-  return (
-    <div ref={ref} className="absolute right-0 top-full mt-2 w-56 border border-white/10 bg-background p-3 shadow-lg shadow-black/40">
-      <p className="font-display text-xs uppercase tracking-widest text-white">{displayName}</p>
-      <p className="mt-1 text-[10px] tracking-wide text-white/40">{address}</p>
-      <div className="mt-3 flex flex-col gap-1">
-        <button
-          onClick={copyAddress}
-          className="cursor-pointer rounded-sm px-3 py-1.5 text-left text-xs uppercase tracking-widest text-white/60 transition-colors hover:bg-white/5 hover:text-white"
-        >
-          {copied ? "Copied" : "Copy address"}
-        </button>
-        <button
-          onClick={() => { disconnect(); onClose() }}
-          className="cursor-pointer rounded-sm px-3 py-1.5 text-left text-xs uppercase tracking-widest text-white/60 transition-colors hover:bg-white/5 hover:text-white"
-        >
-          Disconnect
-        </button>
-      </div>
-    </div>
-  )
-}
+import { useAccount, useDisconnect } from "wagmi"
+import { useMarketStore } from "@/stores/useMarketStore"
 
 function CustomConnectButton() {
-  const [open, setOpen] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const [wasConnected, setWasConnected] = useState(false)
+  const { connector, isConnected } = useAccount()
+  const { disconnect } = useDisconnect()
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
+
+  useEffect(() => {
+    if (isConnected && !wasConnected) {
+      setExpanded(true)
+      timerRef.current = setTimeout(() => setExpanded(false), 2500)
+    }
+    setWasConnected(isConnected)
+    return () => { if (timerRef.current) clearTimeout(timerRef.current) }
+  }, [isConnected])
+
+  const handleMouseEnter = () => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    setExpanded(true)
+  }
+
+  const handleMouseLeave = () => {
+    setExpanded(false)
+  }
 
   return (
     <ConnectButton.Custom>
       {({ account, chain, openConnectModal, openChainModal, mounted }) => {
-        const ready = mounted
-        if (!ready) return null
+        if (!mounted) return null
 
         if (!account) {
           return (
             <button
               onClick={openConnectModal}
-              className="font-display cursor-pointer rounded-sm bg-white px-5 py-1.5 text-xs uppercase tracking-widest text-background transition-all duration-200 hover:bg-background hover:text-white hover:outline hover:outline-1 hover:outline-white"
+              className="cursor-pointer rounded-full border border-white/80 bg-white/5 px-7 py-2.5 text-sm uppercase tracking-widest text-white backdrop-blur-sm transition-all duration-200 "
             >
               Connect
             </button>
@@ -86,7 +52,7 @@ function CustomConnectButton() {
           return (
             <button
               onClick={openChainModal}
-              className="font-display cursor-pointer rounded-sm bg-red-500/80 px-5 py-1.5 text-xs uppercase tracking-widest text-white transition-all duration-200 hover:bg-red-500"
+              className="cursor-pointer rounded-full border border-red-500/80 bg-red-500/10 px-5 py-1.5 text-xs uppercase tracking-widest text-white backdrop-blur-sm transition-all duration-200 "
             >
               Wrong Network
             </button>
@@ -94,23 +60,45 @@ function CustomConnectButton() {
         }
 
         return (
-          <div className="relative">
-            <button
-              onClick={() => setOpen(!open)}
-              className="font-display group cursor-pointer rounded-sm bg-white px-5 py-1.5 text-xs uppercase tracking-widest text-background transition-all duration-200 hover:bg-background hover:text-white hover:outline hover:outline-1 hover:outline-white"
+          <div className="flex items-center gap-3">
+            <Link
+              href="/create"
+              className="group relative flex h-12 w-12 items-center justify-center rounded-full border border-white/80 bg-white/5 text-white backdrop-blur-sm transition-all duration-200 "
             >
-              <span className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-positive group-hover:bg-positive" />
-                {account.displayName}
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                <path d="M12 4v16M4 12h16" />
+              </svg>
+              <span className="pointer-events-none absolute -bottom-9 left-1/2 -translate-x-1/2 rounded-md bg-white px-2.5 py-1 text-[10px] uppercase tracking-widest text-background opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                Create
+              </span>
+            </Link>
+            <button
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
+              onClick={() => disconnect()}
+              className="relative flex h-12 cursor-pointer items-center rounded-full border border-white/80 bg-white/5 overflow-hidden backdrop-blur-sm transition-all duration-300 ease-out "
+              style={{ width: expanded ? 155 : 48 }}
+            >
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center">
+                {connector?.icon ? (
+                  <img
+                    src={connector.icon}
+                    alt={connector.name}
+                    className="h-7 w-7 rounded-full"
+                  />
+                ) : (
+                  <span className="text-base text-white">
+                    {connector?.name?.[0] || "W"}
+                  </span>
+                )}
+              </div>
+              <span
+                className="absolute inset-0 flex items-center justify-center whitespace-nowrap text-xs uppercase tracking-widest text-white transition-opacity duration-300 pointer-events-none"
+                style={{ opacity: expanded ? 1 : 0, paddingLeft: 36 }}
+              >
+                Disconnect
               </span>
             </button>
-            {open && (
-              <AccountDropdown
-                address={account.address}
-                displayName={account.displayName}
-                onClose={() => setOpen(false)}
-              />
-            )}
           </div>
         )
       }}
@@ -118,32 +106,42 @@ function CustomConnectButton() {
   )
 }
 
-export function Header() {
+export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const pathname = usePathname()
+  const { query, setQuery } = useMarketStore()
+  const showSearch = pathname === "/marketplace"
 
   return (
-    <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-        <div className="flex items-center gap-8">
-          <Link href="/marketplace" className="font-display text-xl font-bold tracking-wider">
-            EcoForge
-          </Link>
-          <nav className="hidden items-center gap-1 md:flex">
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  pathname.startsWith(item.href)
-                    ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
-                    : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+    <header className="sticky top-0 z-30 flex h-20 items-center gap-4 px-4">
+      <div className="flex shrink-0 items-center gap-4">
+        <button
+          onClick={onMenuClick}
+          className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/80 bg-white/5 text-white backdrop-blur-sm transition-all duration-200 "
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <Link href="/marketplace" className="font-display text-2xl font-bold tracking-wider text-white">
+          EcoForge
+        </Link>
+      </div>
+
+      {showSearch ? (
+        <div className="flex flex-1 justify-center px-4">
+          <input
+            type="text"
+            placeholder="Search..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="w-full max-w-2xl rounded-full border border-white/80 bg-white/5 px-5 py-2 text-sm text-white placeholder-white/40 outline-none backdrop-blur-sm transition-all duration-200 "
+          />
         </div>
+      ) : (
+        <div className="flex-1" />
+      )}
+
+      <div className="shrink-0">
         <CustomConnectButton />
       </div>
     </header>

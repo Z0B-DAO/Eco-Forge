@@ -8,10 +8,10 @@ export function SearchBar() {
   return (
     <input
       type="text"
-      placeholder="Search by project name, type, region, or ID..."
+      placeholder="Search..."
       value={query}
       onChange={(e) => setQuery(e.target.value)}
-      className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-colors focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600"
+      className="rounded-full border-[1.5px] border-white bg-transparent px-5 py-2 text-sm text-white placeholder-white/40 outline-none transition-all duration-200 focus:border-white focus:ring-0 w-64"
     />
   )
 }

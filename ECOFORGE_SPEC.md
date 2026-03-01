@@ -172,7 +172,7 @@ Even if someone retires the same credit on Verra twice (shouldn't be possible bu
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        FRONTEND (Next.js)                          │
-│  Dashboard │ Marketplace │ Governance │ Create │ Portfolio         │
+│  Dashboard │ Marketplace │ Governance │ Create                    │
 └──────────────────────────────┬──────────────────────────────────────┘
                                │
                     ┌──────────▼──────────┐
@@ -779,7 +779,7 @@ app/
 ├── page.tsx                    # Landing page
 ├── layout.tsx                  # Root layout (wallet provider, theme)
 ├── dashboard/
-│   └── page.tsx                # User dashboard (portfolio, milestones, activity)
+│   └── page.tsx                # User dashboard (stats, holdings, retired, history, governance tokens + milestones)
 ├── marketplace/
 │   ├── page.tsx                # Browse, search & filter credits
 │   └── [creditId]/
@@ -790,10 +790,8 @@ app/
 │   │   └── page.tsx            # Proposal detail + voting
 │   └── disputes/
 │       └── page.tsx            # Active disputes
-├── create/
-│   └── page.tsx                # Create/tokenize new credit (Certified or Community)
-└── portfolio/
-    └── page.tsx                # User's credits, retired, trades, CO2 total
+└── create/
+    └── page.tsx                # Create/tokenize new credit (Certified or Community)
 ```
 
 No API routes, no `/api` directory. All server-side logic is in Server Actions (`actions/` directory).
@@ -1087,7 +1085,6 @@ ecoforge/
 
 - [ ] Create/tokenize credit flow
 - [ ] Governance page (proposals + voting + disputes)
-- [ ] Portfolio page
 - [ ] Charts and data visualization
 
 ### Day 6 — Oracle + Integration

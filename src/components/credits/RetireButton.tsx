@@ -25,7 +25,7 @@ export function RetireButton({ creditId, maxAmount }: { creditId: bigint; maxAmo
       <button
         onClick={handleRetire}
         disabled={isPending || isConfirming || amount <= 0}
-        className="rounded-lg border border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+        className="rounded-lg border-[1.5px] border-white px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isPending ? "Confirm..." : isConfirming ? "Retiring..." : isConfirmed ? "Retired!" : "Retire (Offset CO2)"}
       </button>

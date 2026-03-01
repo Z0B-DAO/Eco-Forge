@@ -46,7 +46,7 @@ const ecoForgeTheme: Theme = {
     standby: "#FFD700",
   },
   fonts: {
-    body: "var(--font-space-grotesk), sans-serif",
+    body: "var(--font-satoshi), sans-serif",
   },
   radii: {
     actionButton: "4px",

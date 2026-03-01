@@ -11,7 +11,7 @@ const SIZES = {
 export function LoadingSpinner({ size = "md" }: LoadingSpinnerProps) {
   return (
     <div
-      className={`${SIZES[size]} animate-spin rounded-full border-zinc-300 border-t-zinc-900 dark:border-zinc-600 dark:border-t-zinc-100`}
+      className={`${SIZES[size]} animate-spin rounded-full border-white/20 border-t-white`}
     />
   )
 }

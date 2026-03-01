@@ -22,14 +22,14 @@
   --color-positive: var(--positive);
   --color-negative: var(--negative);
   --color-border: var(--border);
-  --font-sans: var(--font-space-grotesk);
+  --font-sans: var(--font-satoshi);
   --font-display: var(--font-vipnagorgialla);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-space-grotesk), sans-serif;
+  font-family: var(--font-satoshi), sans-serif;
   overflow-x: hidden;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -45,3 +45,5 @@ body::-webkit-scrollbar {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
 }
+
+

@@ -7,88 +7,79 @@ import {
   type SortOption,
 } from "@/stores/useMarketStore"
 
-const ORIGINS: { value: OriginFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "certified", label: "Certified" },
-  { value: "community", label: "Community" },
+type FilterItem =
+  | { type: "origin"; value: OriginFilter; label: string }
+  | { type: "status"; value: StatusFilter; label: string }
+  | { type: "sort"; value: SortOption; label: string }
+
+const FILTERS: FilterItem[] = [
+  { type: "origin", value: "all", label: "All" },
+  { type: "origin", value: "certified", label: "Certified" },
+  { type: "origin", value: "community", label: "Community" },
+  { type: "status", value: "verified", label: "Verified" },
+  { type: "status", value: "pending", label: "Pending" },
+  { type: "status", value: "suspended", label: "Suspended" },
+  { type: "sort", value: "newest", label: "Newest" },
+  { type: "sort", value: "price_asc", label: "Price ↑" },
+  { type: "sort", value: "price_desc", label: "Price ↓" },
+  { type: "sort", value: "score_desc", label: "Score ↓" },
 ]
-
-const STATUSES: { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "verified", label: "Verified" },
-  { value: "pending", label: "Pending" },
-  { value: "suspended", label: "Suspended" },
-]
-
-const SORTS: { value: SortOption; label: string }[] = [
-  { value: "newest", label: "Newest" },
-  { value: "price_asc", label: "Price ↑" },
-  { value: "price_desc", label: "Price ↓" },
-  { value: "score_desc", label: "Score ↓" },
-]
-
-function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium uppercase tracking-wider text-zinc-500">{label}</span>
-      <div className="flex flex-wrap gap-1.5">{children}</div>
-    </div>
-  )
-}
-
-function Chip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-        active
-          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-          : "bg-zinc-800 text-zinc-400 border border-zinc-700 hover:text-zinc-200"
-      }`}
-    >
-      {label}
-    </button>
-  )
-}
 
 export function CreditFilters() {
   const { origin, status, sortBy, setOrigin, setStatus, setSortBy, resetFilters } =
     useMarketStore()
 
+  const isActive = (item: FilterItem) => {
+    if (item.type === "origin") return origin === item.value
+    if (item.type === "status") return status === item.value
+    return sortBy === item.value
+  }
+
+  const handleClick = (item: FilterItem) => {
+    if (item.type === "origin") setOrigin(isActive(item) ? "all" : item.value)
+    else if (item.type === "status") setStatus(isActive(item) ? "all" : item.value)
+    else setSortBy(isActive(item) ? "newest" : item.value)
+  }
+
+  const hasActiveFilter = origin !== "all" || status !== "all" || sortBy !== "newest"
+
+  const groups = [
+    FILTERS.filter((f) => f.type === "origin"),
+    FILTERS.filter((f) => f.type === "status"),
+    FILTERS.filter((f) => f.type === "sort"),
+  ]
+
   return (
-    <div className="flex flex-wrap items-end gap-6">
-      <FilterGroup label="Origin">
-        {ORIGINS.map((o) => (
-          <Chip key={o.value} label={o.label} active={origin === o.value} onClick={() => setOrigin(o.value)} />
-        ))}
-      </FilterGroup>
-
-      <FilterGroup label="Status">
-        {STATUSES.map((s) => (
-          <Chip key={s.value} label={s.label} active={status === s.value} onClick={() => setStatus(s.value)} />
-        ))}
-      </FilterGroup>
-
-      <FilterGroup label="Sort">
-        {SORTS.map((s) => (
-          <Chip key={s.value} label={s.label} active={sortBy === s.value} onClick={() => setSortBy(s.value)} />
-        ))}
-      </FilterGroup>
-
-      <button
-        onClick={resetFilters}
-        className="ml-auto text-xs text-zinc-500 transition-colors hover:text-zinc-300"
-      >
-        Reset filters
-      </button>
+    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+      {groups.map((group, gi) => (
+        <div key={gi} className="flex items-center gap-2">
+          {gi > 0 && <div className="h-6 w-px shrink-0 bg-white/40" />}
+          {group.map((item) => (
+            <button
+              key={`${item.type}-${item.value}`}
+              onClick={() => handleClick(item)}
+              className={`shrink-0 cursor-pointer rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                isActive(item)
+                  ? "bg-white text-background"
+                  : "bg-white/10 text-white hover:bg-white/40"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      ))}
+      {hasActiveFilter && (
+        <>
+          <div className="h-6 w-px shrink-0 bg-white/40" />
+          <button
+            onClick={resetFilters}
+            className="shrink-0 cursor-pointer px-2 text-sm text-white/40 transition-colors hover:text-white"
+          >
+            ✕
+          </button>
+        </>
+      )}
     </div>
   )
 }

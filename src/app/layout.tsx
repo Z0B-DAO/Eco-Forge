@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { Space_Grotesk } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -10,9 +9,13 @@ const vipnagorgialla = localFont({
   display: "swap",
 });
 
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-space-grotesk",
+const satoshi = localFont({
+  src: [
+    { path: "../../public/fonts/Satoshi-Regular.woff2", weight: "400", style: "normal" },
+    { path: "../../public/fonts/Satoshi-Medium.woff2", weight: "500", style: "normal" },
+    { path: "../../public/fonts/Satoshi-Bold.woff2", weight: "700", style: "normal" },
+  ],
+  variable: "--font-satoshi",
   display: "swap",
 });
 
@@ -32,7 +35,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: `history.scrollRestoration="manual";window.scrollTo(0,0);` }} />
       </head>
       <body
-        className={`${vipnagorgialla.variable} ${spaceGrotesk.variable} antialiased`}
+        className={`${vipnagorgialla.variable} ${satoshi.variable} antialiased`}
       >
         <Providers>{children}</Providers>
       </body>

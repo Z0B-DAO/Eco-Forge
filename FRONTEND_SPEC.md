@@ -41,7 +41,7 @@ Crédits soumis directement par un porteur de projet, sans passer par un registr
 - Chaque `CreditCard` et `CreditDetail` affiche le badge d'origine
 - Le marketplace permet de filtrer par origine (Certified / Community Verified / All)
 - La page `/create` propose deux parcours distincts selon le type
-- Le portfolio différencie visuellement les deux types
+- Le dashboard différencie visuellement les deux types dans l'onglet Holdings
 
 ---
 
@@ -50,7 +50,7 @@ Crédits soumis directement par un porteur de projet, sans passer par un registr
 | Route | Page | Description |
 |---|---|---|
 | `/` | Landing | Présentation du projet, stats globales, CTA "Launch App" |
-| `/dashboard` | Dashboard | Vue d'ensemble : crédits, governance tokens, progression paliers, activité récente |
+| `/dashboard` | Dashboard | Vue d'ensemble unifiée : 4 stat cards (portfolio value, credits held, CO2 offset, governance tokens + milestone bar), 3 onglets (Holdings, Retired, History) |
 | `/marketplace` | Marketplace | Browse tous les crédits, **barre de recherche**, filtres, acheter, signaler |
 | `/marketplace/[creditId]` | Détail crédit | Toutes les infos, score AI, historique, buy/sell, **bouton Challenge** |
 | `/create` | Créer un crédit | Choix du type (Certified ou Community), puis formulaire adapté |
@@ -59,7 +59,6 @@ Crédits soumis directement par un porteur de projet, sans passer par un registr
 | `/governance` | Gouvernance | Liste des proposals + disputes actives |
 | `/governance/[proposalId]` | Détail proposal | Description, votes pour/contre, voter |
 | `/governance/disputes` | Disputes | Crédits contestés, formulaire de challenge |
-| `/portfolio` | Portfolio | Tes crédits, crédits retirés (burned), historique de trades, P&L |
 
 ---
 
@@ -277,10 +276,6 @@ Landing → Connect Wallet → Dashboard
               ▼               ▼               ▼
          Search/Buy      Vote/Dispute    Tokenize
          Sell/Challenge   Proposals      New Credit
-              │               │               │
-              └───────────────┼───────────────┘
-                              ▼
-                          Portfolio
 ```
 
 ---
@@ -307,8 +302,6 @@ src/
 │   │   │   └── page.tsx
 │   │   └── disputes/
 │   │       └── page.tsx
-│   └── portfolio/
-│       └── page.tsx
 ├── components/
 │   ├── layout/
 │   │   ├── Header.tsx

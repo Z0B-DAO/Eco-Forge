@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useMemo, useCallback, useEffect } from "react";
+import { useRef, useMemo, useCallback, useEffect, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import * as THREE from "three";
@@ -614,37 +614,39 @@ function StreakParticles({
 }
 
 // ─── Scene ───
-function BlobScene() {
+function BlobScene({ isStatic = false }: { isStatic?: boolean }) {
   const timeRef = useRef(0);
   const impulseRef = useRef(0);
   const clickTypeRef = useRef(0);
   const visibleLayerRef = useRef(0);
   const clickDirRef = useRef(new THREE.Vector3(0, 0, 1));
   const clickModeRef = useRef(1.0);
-  const formationRef = useRef(0);
+  const formationRef = useRef(isStatic ? 1 : 0);
   const { gl, camera } = useThree();
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const blobSphere = useMemo(() => new THREE.Sphere(new THREE.Vector3(0, 0, 0), 0.95), []);
 
-  const zoomDoneRef = useRef(false);
+  const zoomDoneRef = useRef(isStatic);
 
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1);
     timeRef.current = (timeRef.current + delta) % 10000;
 
-    if (formationRef.current < 0.999) {
+    if (!isStatic && formationRef.current < 0.999) {
       formationRef.current += (1.0 - formationRef.current) * 1.5 * delta;
     } else {
       formationRef.current = 1;
     }
 
-    const sp = (window as unknown as Record<string, { current: number }>).__scrollProgress;
-    if (sp) {
-      const raw = Math.min(1, Math.max(0, (sp.current - 0.03) / 0.77));
-      const progress = raw * raw;
-      camera.position.z = 2.8 - progress * 2.7;
-      zoomDoneRef.current = progress >= 1;
+    if (!isStatic) {
+      const sp = (window as unknown as Record<string, { current: number }>).__scrollProgress;
+      if (sp) {
+        const raw = Math.min(1, Math.max(0, (sp.current - 0.03) / 0.77));
+        const progress = raw * raw;
+        camera.position.z = 2.8 - progress * 2.7;
+        zoomDoneRef.current = progress >= 1;
+      }
     }
 
     impulseRef.current *= 0.978;
@@ -721,15 +723,21 @@ function BlobScene() {
   );
 }
 
-export default function Blob() {
+export default function Blob({ cameraZ = 2.8 }: { cameraZ?: number } = {}) {
+  const [ready, setReady] = useState(false);
+
   return (
-    <div className="fixed inset-0 z-0">
+    <div
+      className="fixed inset-0 z-0 transition-opacity duration-500"
+      style={{ opacity: ready ? 1 : 0 }}
+    >
       <Canvas
-        camera={{ position: [0, 0, 2.8], fov: 50 }}
+        camera={{ position: [0, 0, cameraZ], fov: 50 }}
         gl={{ antialias: true, alpha: true }}
         dpr={[1, 2]}
+        onCreated={() => requestAnimationFrame(() => requestAnimationFrame(() => setReady(true)))}
       >
-        <BlobScene />
+        <BlobScene isStatic={cameraZ !== 2.8} />
       </Canvas>
     </div>
   );

@@ -1,50 +1,119 @@
 "use client"
 
 import { use } from "react"
-import { useCreditDetail } from "@/hooks/useCreditDetail"
-import { useMarketplace } from "@/hooks/useMarketplace"
-import { useAccount, useReadContract } from "wagmi"
-import { CONTRACT_ADDRESSES, CARBON_CREDIT_ABI } from "@/services/web3/contracts"
 import { CreditOriginBadge } from "@/components/credits/CreditOriginBadge"
 import { CreditStatusBadge } from "@/components/credits/CreditStatusBadge"
 import { ImpactScoreBadge } from "@/components/credits/ImpactScoreBadge"
 import { TradePanel } from "@/components/credits/TradePanel"
 import { ChallengeButton } from "@/components/credits/ChallengeButton"
 import { RetireButton } from "@/components/credits/RetireButton"
-import { LoadingSpinner } from "@/components/common/LoadingSpinner"
-import { formatAvax, formatTimestamp, truncateAddress } from "@/lib/utils"
+import { truncateAddress } from "@/lib/utils"
+import { CreditOrigin, CreditStatus } from "@/types"
+import type { CreditType, Listing } from "@/types"
+
+const MOCK_CREDITS: CreditType[] = [
+  {
+    id: 1n,
+    projectName: "Amazon Rainforest REDD+",
+    projectType: "Forest Conservation",
+    region: "Brazil",
+    vintageYear: 2024n,
+    tonnesCO2e: 5000n,
+    totalSupply: 5000n,
+    impactScore: 92n,
+    metadataURI: "ipfs://QmMockHash1",
+    origin: CreditOrigin.Certified,
+    status: CreditStatus.Verified,
+    issuer: "0x1234567890abcdef1234567890abcdef12345678",
+    registrySource: "Verra",
+    retirementProof: "VCS-2024-001",
+  },
+  {
+    id: 2n,
+    projectName: "Gujarat Solar Farm",
+    projectType: "Renewable Energy",
+    region: "India",
+    vintageYear: 2024n,
+    tonnesCO2e: 12000n,
+    totalSupply: 12000n,
+    impactScore: 87n,
+    metadataURI: "ipfs://QmMockHash2",
+    origin: CreditOrigin.Certified,
+    status: CreditStatus.Verified,
+    issuer: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+    registrySource: "Gold Standard",
+    retirementProof: "GS-2024-042",
+  },
+  {
+    id: 3n,
+    projectName: "Mangrove Restoration Senegal",
+    projectType: "Blue Carbon",
+    region: "Senegal",
+    vintageYear: 2025n,
+    tonnesCO2e: 800n,
+    totalSupply: 800n,
+    impactScore: 78n,
+    metadataURI: "ipfs://QmMockHash3",
+    origin: CreditOrigin.CommunityVerified,
+    status: CreditStatus.Pending,
+    issuer: "0x9876543210fedcba9876543210fedcba98765432",
+    registrySource: "",
+    retirementProof: "",
+  },
+  {
+    id: 4n,
+    projectName: "Kenya Cookstoves Program",
+    projectType: "Clean Cooking",
+    region: "Kenya",
+    vintageYear: 2024n,
+    tonnesCO2e: 3200n,
+    totalSupply: 3200n,
+    impactScore: 95n,
+    metadataURI: "ipfs://QmMockHash4",
+    origin: CreditOrigin.Certified,
+    status: CreditStatus.Verified,
+    issuer: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+    registrySource: "Gold Standard",
+    retirementProof: "GS-2024-108",
+  },
+  {
+    id: 5n,
+    projectName: "Borneo Peatland Protection",
+    projectType: "Wetland Conservation",
+    region: "Indonesia",
+    vintageYear: 2025n,
+    tonnesCO2e: 1500n,
+    totalSupply: 1500n,
+    impactScore: 64n,
+    metadataURI: "ipfs://QmMockHash5",
+    origin: CreditOrigin.CommunityVerified,
+    status: CreditStatus.Verified,
+    issuer: "0xcafebabecafebabecafebabecafebabecafebabe",
+    registrySource: "",
+    retirementProof: "",
+  },
+]
+
+const MOCK_LISTINGS: Listing[] = [
+  { listingId: 1n, creditId: 1n, seller: "0x1234567890abcdef1234567890abcdef12345678", amount: 500n, pricePerUnit: 2500000000000000n, active: true },
+  { listingId: 2n, creditId: 2n, seller: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd", amount: 2000n, pricePerUnit: 1800000000000000n, active: true },
+  { listingId: 3n, creditId: 3n, seller: "0x9876543210fedcba9876543210fedcba98765432", amount: 800n, pricePerUnit: 4200000000000000n, active: true },
+  { listingId: 4n, creditId: 4n, seller: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef", amount: 1000n, pricePerUnit: 3100000000000000n, active: true },
+  { listingId: 5n, creditId: 5n, seller: "0xcafebabecafebabecafebabecafebabecafebabe", amount: 1500n, pricePerUnit: 900000000000000n, active: true },
+]
 
 export default function CreditDetailPage({ params }: { params: Promise<{ creditId: string }> }) {
   const { creditId: creditIdStr } = use(params)
   const creditId = BigInt(creditIdStr)
-  const { address } = useAccount()
 
-  const { data: credit, isLoading } = useCreditDetail(creditId)
-  const { data: listings } = useMarketplace()
-
-  const { data: userBalance } = useReadContract({
-    address: CONTRACT_ADDRESSES.carbonCredit,
-    abi: CARBON_CREDIT_ABI,
-    functionName: "balanceOf",
-    args: address ? [address, creditId] : undefined,
-    query: { enabled: !!address },
-  })
-
-  const listing = listings?.find((l) => l.creditId === creditId)
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center py-20">
-        <LoadingSpinner size="lg" />
-      </div>
-    )
-  }
+  const credit = MOCK_CREDITS.find((c) => c.id === creditId)
+  const listing = MOCK_LISTINGS.find((l) => l.creditId === creditId)
 
   if (!credit) {
     return <p className="py-20 text-center text-zinc-400">Credit not found.</p>
   }
 
-  const balance = userBalance ? Number(userBalance as bigint) : 0
+  const balance = 42
 
   return (
     <div className="grid gap-8 lg:grid-cols-3">

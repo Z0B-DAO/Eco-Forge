@@ -141,7 +141,7 @@ function AvatarCard({ name, image, imageStyle, x = "#", linkedin = "#", github =
           </div>
         </div>
       </div>
-      <p className="mt-6 text-center font-display text-xl tracking-wider text-foreground md:text-2xl">
+      <p className="mt-6 text-center text-xl tracking-wider text-foreground md:text-2xl">
         {name}
       </p>
     </div>
@@ -229,7 +229,7 @@ export default function Home() {
             {/* Bottom marquee banner */}
             <div className="w-full overflow-hidden bg-white py-0.5">
               <div
-                className="flex whitespace-nowrap font-display text-xs uppercase tracking-wider text-background md:text-sm"
+                className="flex whitespace-nowrap text-xs uppercase tracking-wider text-background md:text-sm"
                 style={{ animation: "marquee 20s linear infinite" }}
               >
                 <span className="flex shrink-0 items-center"><MarqueeContent /></span>
@@ -244,7 +244,7 @@ export default function Home() {
             className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"
             style={{ opacity: 0 }}
           >
-            <Link href="/marketplace" className="font-display rounded-full border border-white/80 bg-white/5 px-10 py-4 text-lg tracking-wide text-white backdrop-blur-sm transition-all hover:bg-white/10 hover:shadow-[0_0_30px_rgba(255,255,255,0.15)]">
+            <Link href="/marketplace" className="rounded-full border border-white/80 bg-white/5 px-10 py-4 text-lg tracking-wide text-white backdrop-blur-sm transition-all hover:bg-white/10 hover:shadow-[0_0_30px_rgba(255,255,255,0.15)]">
               Launch App
             </Link>
           </div>
@@ -255,12 +255,12 @@ export default function Home() {
       <section className="relative z-10 min-h-screen px-8 py-16 md:px-16 md:py-24">
         {/* Header row */}
         <div className="flex items-start justify-between">
-          <h2 className="font-display text-4xl tracking-wider text-foreground md:text-5xl">
+          <h2 className="text-4xl tracking-wider text-foreground md:text-5xl">
             About us :
           </h2>
           <a href="https://devinciblockchain.com/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3">
             <img src="/images/devinci-blockchain.png" alt="DeVinci Blockchain" className="h-12 w-auto md:h-14" />
-            <span className="text-left font-display text-sm leading-tight tracking-wider text-foreground md:text-base">
+            <span className="text-left text-sm leading-tight tracking-wider text-foreground md:text-base">
               DeVinci<br />Blockchain
             </span>
           </a>
