@@ -106,17 +106,28 @@ const MOCK_LISTINGS: Listing[] = [
 
 export default function CreditDetailPage({ params }: { params: Promise<{ creditId: string }> }) {
   const { creditId: creditIdStr } = use(params)
-  const creditId = BigInt(creditIdStr)
+  const [copied, setCopied] = useState(false)
+
+  let creditId: bigint | null = null
+  try {
+    const n = BigInt(creditIdStr)
+    if (n > 0n) creditId = n
+  } catch {
+    creditId = null
+  }
+
+  if (creditId === null) {
+    return <p className="py-20 text-center text-zinc-400">Invalid credit ID.</p>
+  }
 
   const credit = MOCK_CREDITS.find((c) => c.id === creditId)
   const listing = MOCK_LISTINGS.find((l) => l.creditId === creditId)
-  const [copied, setCopied] = useState(false)
 
   if (!credit) {
     return <p className="py-20 text-center text-zinc-400">Credit not found.</p>
   }
 
-  const balance = 42
+  const balance: number = 42
 
   return (
     <div className="grid gap-8 lg:grid-cols-3 lg:items-start">

@@ -205,13 +205,14 @@ The Anthropic API key is NEVER exposed client-side.
 **Backup:** `src/components/landing/Blob.backup.tsx` — pre-directional-click version
 
 ### Done (Step 4 — Hooks)
-16 custom hooks in `src/hooks/`:
+17 custom hooks in `src/hooks/`:
 - **Read hooks:** `useCredits`, `useCreditDetail`, `useMarketplace`, `useLastSoldPrice`, `useGovernanceToken`, `useMilestoneProgress`, `useProposals`, `useTradeHistory`, `useRetiredCredits`, `useSearchCredits`, `useUserPortfolio`
 - **Write hooks:** `useBuyCredit`, `useListCredit`, `useRetireCredit`, `useVote`, `useDispute`
+- **Approval hook:** `useApproveCredits` — checks `isApprovedForAll(user, marketplace)` + calls `setApprovalForAll`. Required before `listCredits`.
 - **Config:** `src/services/web3/config.ts` — wagmi config (Fuji chain, RPC, WalletConnect)
 - **Barrel export:** `src/hooks/index.ts`
 
-Pattern: scan events with `getLogs` → collect IDs → `readContract` per ID (no `getAll()` in Solidity). Write hooks return full tx lifecycle: `isPending` → `isConfirming` → `isConfirmed`.
+Pattern: scan events with `getLogs` → collect IDs → `readContract` per ID (no `getAll()` in Solidity). Write hooks return full tx lifecycle: `isPending` → `isConfirming` → `isConfirmed`. All write hooks invalidate relevant React Query caches on tx confirmation (`useEffect` on `receipt.isSuccess`).
 
 ### Done (Step 5 — Zustand Store)
 - `src/stores/useMarketStore.ts` — Marketplace UI state (query, origin, status, sortBy, priceMin/Max, scoreMin/Max, projectTypes, regions). Client-side filtering only, no indexer.
@@ -287,9 +288,92 @@ Pattern: scan events with `getLogs` → collect IDs → `readContract` per ID (n
 - `/governance/[proposalId]` — Back button (card style with arrow SVG, same as marketplace), click-to-copy proposer address (full, with "Copied" overlay), description card, `CreditCard` for contested credit (fetched via `DisputeRaised` event logs matching `autoProposalId` — links to `/marketplace/[id]`), vote bar, vote FOR/AGAINST buttons, "You have already voted" banner. Scrollable (`h-full overflow-y-auto`). All sections `border-[0.5px] border-white/60 bg-[#111111]`.
 - `/governance/disputes` — Disputes list + challenge submission form (stake-to-dispute). Credit ID input: `min="1"` + positive integer validation. "← Proposals" button card style. Fixed header + form, scrollable disputes list.
 
-### TODO (Steps 7-8)
-- Step 7: Server Actions (generateImpactScore, analyzeDispute) — mocked
-- Step 8: IPFS service (Lighthouse)
+### Done (Step 6.8 — Smart Contracts Merged from `dev`)
+
+**5 Solidity contracts** in `src/contracts/`, fully tested in `test/`:
+- `CarbonCredit.sol` — ERC-1155 + AccessControl + Pausable. Roles: MINTER, VERIFIER, ADMIN. `CreditParams` struct. Anti-double-bridge via `_usedRetirementProofs[hash]`. Private mappings with public getters (`getCreditType`, `isBlacklisted`, `isDisputed`, `isRetirementProofUsed`).
+- `Marketplace.sol` — ReentrancyGuard. Private `_listings` mapping with `getListing()` getter. Pull-pattern fees (`accumulatedFees` + `withdrawFees`). Emits `Listed`, `Sold`, `ListingCancelled`, `PriceUpdated`.
+- `EcoForgeGovernance.sol` — Private `_proposals`/`_disputes` with getters `getProposal()`/`getDispute()`/`getDisputeStake()`/`hasVoted()`. `disputeCredit()` burns stake + auto-creates proposal. `execute()` resolves FOR wins. `resolveDisputeAgainst()` for AGAINST wins. `vote()` calls `recordAction` via try/catch.
+- `EcoForgeToken.sol` — Soulbound via `_update` override (blocks all transfers except mint/burn). `recordAction()` auto-mints at milestones. `mint()`, `burn()`, `burnAll()`. Daily action cap.
+- `EcoForgeOracle.sol` — Chainlink FunctionsClient. `requestImpactScore()` (REQUESTER_ROLE). Callbacks update CarbonCredit impact score.
+
+**Deploy script** (`script/Deploy.s.sol`): Deploys all 5 + grants cross-contract roles.
+**Seed script** (`script/Seed.s.sol`): 4 sample credits + marketplace listings.
+
+**Deployed addresses (Fuji):**
+```
+CarbonCredit:  0x292834ceD52eA68190444E5a6F324906f0F0B449
+Marketplace:   0x3f0Fa80C11bAc6c9f132922407A4ecf9E2Ad0614
+EcoForgeToken: 0x4E55dDCc3548870906F458A898c742CC6152E25E
+Governance:    0x0a894616725CeeE51DfA32E153b8ee0841B2E11a
+Oracle:        0xdFE818b8d6C0172cFA5186fC4a25505Ab6c73Bcc
+```
+
+### Done (Step 6.9 — Integration Fixes)
+
+**All integration issues from Step 6.8 are now FIXED:**
+
+**ABIs rewritten (`contracts.ts`):**
+- `listings()` → `getListing()`, `proposals()` → `getProposal()`, `disputes()` → `getDispute()` (private mappings → public getters)
+- `createCertifiedCredit` / `createCommunityCredit` — now use `CreditParams` tuple struct (matching Solidity)
+- `DISPUTE_STAKE_AMOUNT` → `disputeStakeAmount` (camelCase immutable)
+- `calldataPayload` → `actionCalldata`
+- `ScoreRequested` event param order fixed (`requestId, creditId`)
+- Added all missing entries: `hasVoted`, `getDisputeStake`, `getDisputeProposalId`, `isDisputed`, `isApprovedForAll`, `setApprovalForAll`, `verifyCommunityCredit`, `suspendCredit`, `blacklist`, `setDisputed`, `updateImpactScore`, `mint`, `burn`, `burnAll`, `recordAction`, `decimals`, `PriceUpdated`, `ScoreRequestFailed`, `resolveDisputeAgainst`, `withdrawFees`, `accumulatedFees`, `disputeBonusAmount`, `minProposalTokens`
+- `getProposal` output tuple now includes `actionCalldata: bytes`
+- `getUserProgress` outputs as individual returns (not tuple — matches Solidity `returns (uint256, uint256, uint256, uint256)`)
+
+**Types fixed (`types/contracts.ts`):**
+- `Proposal` interface: added `actionCalldata: \`0x${string}\``
+
+**Env vars fixed (`.env.local`):**
+- `NEXT_PUBLIC_TOKEN_ADDRESS` → `NEXT_PUBLIC_ECOFORGE_TOKEN_ADDRESS` (aligned with `contracts.ts`)
+- All 5 contract addresses filled (Governance + Oracle were missing)
+
+**Hooks fixed:**
+- `useMarketplace` — `listings` → `getListing`
+- `useProposals` — `proposals` → `getProposal`
+- All write hooks now invalidate React Query caches on tx confirmation
+- New `useApproveCredits` hook created
+
+**Frontend bugs fixed:**
+- `hasVoted` now reads from contract via `hasVoted(proposalId, voter)` query (persistent across refreshes)
+- Sidebar active state: uses `pathname === href || pathname.startsWith(href + "/")` (no overlap between `/governance` and child routes)
+- BigInt validation on `/marketplace/[creditId]` and `/governance/[proposalId]` (try/catch + error page)
+- Milestone bar reaches 100% when all tiers complete (`isComplete` flag)
+- Milestone bar CSS typo fixed (`bg-whitetransition` → `bg-[#f97316] transition`)
+- Disputes page: dispute IDs use `index + 1` (matches `_nextDisputeId` starting at 1)
+- Create page: args adapted to `CreditParams` struct format
+
+**Cache invalidation map (write hook → invalidated queries):**
+- `useBuyCredit` → `marketplace-listings`, `user-portfolio`, `trade-history`, `credit-detail`
+- `useListCredit` → `marketplace-listings`, `user-portfolio`
+- `useRetireCredit` → `credit-detail`, `user-portfolio`, `retired-credits`
+- `useVote` → `proposals`, `proposal`, `hasVoted`
+- `useDispute` → `proposals`, `credit-detail`, `disputes`, `governance-token`
+
+### Done (Step 7 — Server Actions, mocked)
+
+**2 Server Actions** in `src/actions/`:
+- `generateImpactScore.ts` — `"use server"`. Takes `{ project: ProjectData, proof?: RetirementProof, satelliteImageUrl?: string }`. Returns `ImpactScore` (score, breakdown with 4 sub-scores, proofConsistency, reasoning, riskFactors, confidence). Mocked with 1.5s delay, realistic scoring heuristics. Certified credits score higher. TODO: replace with real Claude API call.
+- `analyzeDispute.ts` — `"use server"`. Takes `{ project: ProjectData, disputeReason: string, creditScore?: number, evidenceUrls?: string[] }`. Returns `DisputeAnalysis` (validity, confidence, recommendation, reasoning, redFlags, supportingEvidence). Mocked with 2s delay. TODO: replace with real Claude API call.
+
+### Done (Step 8 — IPFS Service)
+
+- `src/services/ipfs/lighthouse.ts` — Lighthouse SDK wrapper. Server-side only (`LIGHTHOUSE_API_KEY`).
+  - `uploadJSON(data, name?)` → `UploadResult { cid, url, size }`
+  - `uploadFile(file)` → `UploadResult`
+  - `uploadCreditMetadata(metadata)` → `UploadResult` (pre-formatted for credit data, adds timestamp + platform)
+  - `ipfsUrl(cid)` → gateway URL (`https://gateway.lighthouse.storage/ipfs/{cid}`)
+
+### Known Remaining Issues
+
+**Solidity limitation (non-blocking):**
+- `DisputeRaised` event doesn't emit `disputeId` — disputes page infers ID from event order (`index + 1`). Works if no events are missed, but fragile. Could add `disputeId` to event in V2.
+
+**UX (non-blocking):**
+- Create page: silent fail on invalid BigInt input (no error toast shown to user)
+- `useApproveCredits` not yet wired into the listing flow UI (hook exists, UI doesn't prompt user to approve before listing)
 
 ## Design System — Monochrome
 
@@ -310,7 +394,7 @@ Pattern: scan events with `getLogs` → collect IDs → `readContract` per ID (n
 - No REST API — only Server Actions
 - No database — all state is on-chain or IPFS
 - Foundry for contracts: `forge build`, `forge test`, `forge script`
-- Foundry config: set `src = "contracts"` in foundry.toml to avoid conflict with Next.js `src/`
+- Foundry config: `src = "src/contracts"` in foundry.toml, `out = "out"`, optimizer 200 runs, Solidity 0.8.24
 - Frontend sources in `src/` (Next.js app directory)
 - No unnecessary comments in code — explain in conversation, keep code clean
 - Git: frontend work on `frontend` branch, smart contracts on separate branch
@@ -328,15 +412,19 @@ Pattern: scan events with `getLogs` → collect IDs → `readContract` per ID (n
 ## Environment Variables Required
 
 ```
-ANTHROPIC_API_KEY              # Claude API (server-side only) — not used yet (mocked)
-LIGHTHOUSE_API_KEY             # IPFS uploads
-NEXT_PUBLIC_WALLETCONNECT_ID   # WalletConnect project ID (free at cloud.walletconnect.com)
-FUJI_RPC_URL                   # Avalanche Fuji testnet
-SNOWTRACE_API_KEY              # Contract verification
-DEPLOYER_PRIVATE_KEY           # Contract deployment (never commit)
-NEXT_PUBLIC_CHAIN_ID=43113     # Fuji
-NEXT_PUBLIC_AVALANCHE_RPC      # Public RPC for frontend
-NEXT_PUBLIC_*_ADDRESS          # Deployed contract addresses
+ANTHROPIC_API_KEY                    # Claude API (server-side only) — not used yet (mocked)
+LIGHTHOUSE_API_KEY                   # IPFS uploads
+NEXT_PUBLIC_WALLETCONNECT_ID         # WalletConnect project ID
+FUJI_RPC_URL                         # Avalanche Fuji testnet
+SNOWTRACE_API_KEY                    # Contract verification
+DEPLOYER_PRIVATE_KEY                 # Contract deployment (never commit)
+NEXT_PUBLIC_CHAIN_ID=43113           # Fuji
+NEXT_PUBLIC_AVALANCHE_RPC            # Public RPC for frontend
+NEXT_PUBLIC_CARBON_CREDIT_ADDRESS    # CarbonCredit contract
+NEXT_PUBLIC_MARKETPLACE_ADDRESS      # Marketplace contract
+NEXT_PUBLIC_ECOFORGE_TOKEN_ADDRESS   # EcoForgeToken contract
+NEXT_PUBLIC_GOVERNANCE_ADDRESS       # Governance contract
+NEXT_PUBLIC_ORACLE_ADDRESS           # Oracle contract
 ```
 
 ## What NOT to do

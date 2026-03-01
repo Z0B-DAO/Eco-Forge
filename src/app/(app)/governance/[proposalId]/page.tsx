@@ -2,7 +2,7 @@
 
 import { use, useState, useCallback } from "react"
 import Link from "next/link"
-import { usePublicClient } from "wagmi"
+import { usePublicClient, useAccount } from "wagmi"
 import { useQuery } from "@tanstack/react-query"
 import { useVote } from "@/hooks/useVote"
 import { useGovernanceToken } from "@/hooks/useGovernanceToken"
@@ -11,24 +11,46 @@ import { LoadingBar } from "@/components/common/LoadingSpinner"
 import { CreditCard } from "@/components/credits/CreditCard"
 import { ProposalType } from "@/types"
 import type { Proposal, CreditType } from "@/types"
-import { timeFromNow, percentage, truncateAddress } from "@/lib/utils"
+import { timeFromNow, percentage } from "@/lib/utils"
 
 export default function ProposalDetailPage({ params }: { params: Promise<{ proposalId: string }> }) {
   const { proposalId: proposalIdStr } = use(params)
-  const proposalId = BigInt(proposalIdStr)
   const publicClient = usePublicClient()
+  const { address } = useAccount()
+
+  let proposalId: bigint | null = null
+  try {
+    const n = BigInt(proposalIdStr)
+    if (n > 0n) proposalId = n
+  } catch {
+    proposalId = null
+  }
 
   const { data: proposal, isLoading } = useQuery({
     queryKey: ["proposal", proposalIdStr],
-    enabled: !!publicClient,
+    enabled: !!publicClient && proposalId !== null,
     queryFn: async () => {
-      if (!publicClient) throw new Error("No client")
+      if (!publicClient || proposalId === null) throw new Error("No client")
       return publicClient.readContract({
         address: CONTRACT_ADDRESSES.governance,
         abi: GOVERNANCE_ABI,
-        functionName: "proposals",
+        functionName: "getProposal",
         args: [proposalId],
       }) as Promise<Proposal>
+    },
+  })
+
+  const { data: hasVoted } = useQuery({
+    queryKey: ["hasVoted", proposalIdStr, address],
+    enabled: !!publicClient && !!address && proposalId !== null,
+    queryFn: async () => {
+      if (!publicClient || !address || proposalId === null) return false
+      return publicClient.readContract({
+        address: CONTRACT_ADDRESSES.governance,
+        abi: GOVERNANCE_ABI,
+        functionName: "hasVoted",
+        args: [proposalId, address],
+      }) as Promise<boolean>
     },
   })
 
@@ -70,6 +92,10 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ propo
   const { vote, isPending, isConfirming, isConfirmed, error } = useVote()
   const { balance } = useGovernanceToken()
 
+  if (proposalId === null) {
+    return <p className="py-20 text-center text-zinc-400">Invalid proposal ID.</p>
+  }
+
   return (
     <LoadingBar isLoading={isLoading}>
       {proposal ? (
@@ -83,6 +109,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ propo
           isConfirmed={isConfirmed}
           error={error}
           balance={balance}
+          hasVoted={!!hasVoted}
         />
       ) : (
         <p className="py-20 text-center text-zinc-400">Proposal not found.</p>
@@ -91,7 +118,7 @@ export default function ProposalDetailPage({ params }: { params: Promise<{ propo
   )
 }
 
-function ProposalContent({ proposal, proposalId, disputeCredit, vote, isPending, isConfirming, isConfirmed, error, balance }: {
+function ProposalContent({ proposal, proposalId, disputeCredit, vote, isPending, isConfirming, isConfirmed, error, balance, hasVoted }: {
   proposal: Proposal
   proposalId: bigint
   disputeCredit?: CreditType
@@ -101,9 +128,9 @@ function ProposalContent({ proposal, proposalId, disputeCredit, vote, isPending,
   isConfirmed: boolean
   error: Error | null
   balance: bigint | undefined
+  hasVoted: boolean
 }) {
   const [copied, setCopied] = useState(false)
-  const [hasVoted, setHasVoted] = useState(false)
 
   const copyAddress = useCallback(() => {
     navigator.clipboard.writeText(proposal.proposer)
@@ -118,7 +145,6 @@ function ProposalContent({ proposal, proposalId, disputeCredit, vote, isPending,
 
   const handleVote = (support: boolean) => {
     vote(proposalId, support)
-    setHasVoted(true)
   }
 
   return (

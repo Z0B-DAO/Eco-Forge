@@ -47,12 +47,13 @@ export default function DisputesPage() {
 
       const results: DisputeWithCredit[] = await Promise.all(
         logs.map(async (log, index) => {
+          const disputeId = BigInt(index + 1)
           const [dispute, credit] = await Promise.all([
             publicClient.readContract({
               address: CONTRACT_ADDRESSES.governance,
               abi: GOVERNANCE_ABI,
-              functionName: "disputes",
-              args: [BigInt(index)],
+              functionName: "getDispute",
+              args: [disputeId],
             }) as Promise<Dispute>,
             log.args.creditId !== undefined
               ? (publicClient.readContract({

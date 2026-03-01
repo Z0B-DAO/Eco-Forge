@@ -56,6 +56,7 @@ export interface Proposal {
   againstVotes: bigint
   deadline: bigint
   executed: boolean
+  actionCalldata: `0x${string}`
 }
 
 export interface Dispute {

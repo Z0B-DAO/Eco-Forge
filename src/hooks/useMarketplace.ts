@@ -39,7 +39,7 @@ export function useMarketplace() {
           publicClient.readContract({
             address: CONTRACT_ADDRESSES.marketplace,
             abi: MARKETPLACE_ABI,
-            functionName: "listings",
+            functionName: "getListing",
             args: [id],
           })
         )

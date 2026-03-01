@@ -67,6 +67,16 @@ export default function CreatePage() {
 
     const metadataURI = ""
 
+    const params = {
+      projectName: form.projectName,
+      projectType: form.projectType,
+      region: form.region,
+      vintageYear,
+      tonnesCO2e,
+      initialSupply: totalSupply,
+      metadataURI,
+    }
+
     if (path === "certified") {
       if (!form.registrySource || !form.retirementProof) return
       writeContract({
@@ -74,15 +84,11 @@ export default function CreatePage() {
         abi: CARBON_CREDIT_ABI,
         functionName: "createCertifiedCredit",
         args: [
-          form.projectName,
-          form.projectType,
-          form.region,
-          vintageYear,
-          tonnesCO2e,
-          totalSupply,
-          metadataURI,
+          params,
           form.registrySource,
           form.retirementProof,
+          "0x0000000000000000000000000000000000000000" as `0x${string}`,
+          false,
         ],
       })
     } else {
@@ -90,15 +96,7 @@ export default function CreatePage() {
         address: CONTRACT_ADDRESSES.carbonCredit,
         abi: CARBON_CREDIT_ABI,
         functionName: "createCommunityCredit",
-        args: [
-          form.projectName,
-          form.projectType,
-          form.region,
-          vintageYear,
-          tonnesCO2e,
-          totalSupply,
-          metadataURI,
-        ],
+        args: [params],
       })
     }
   }

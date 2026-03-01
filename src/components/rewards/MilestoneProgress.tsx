@@ -10,14 +10,15 @@ export function MilestoneProgress() {
 
   const actions = Number(progress.actions)
   const currentTier = Number(progress.currentMilestone)
-  const nextMilestone = milestones[currentTier]
+  const isComplete = currentTier >= milestones.length
+  const nextMilestone = !isComplete ? milestones[currentTier] : null
   const prevActions = currentTier > 0 ? Number(milestones[currentTier - 1].actionsRequired) : 0
 
-  const targetActions = nextMilestone ? Number(nextMilestone.actionsRequired) : actions
+  const targetActions = nextMilestone ? Number(nextMilestone.actionsRequired) : prevActions
   const reward = nextMilestone ? Number(nextMilestone.tokensRewarded) : 0
-  const range = targetActions - prevActions
-  const done = actions - prevActions
-  const pct = range > 0 ? Math.min(100, Math.round((done / range) * 100)) : 100
+  const range = nextMilestone ? targetActions - prevActions : 1
+  const done = nextMilestone ? actions - prevActions : 1
+  const pct = nextMilestone ? Math.min(100, Math.round((done / range) * 100)) : 100
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
@@ -37,7 +38,7 @@ export function MilestoneProgress() {
 
       <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-800">
         <div
-          className="h-full rounded-full bg-whitetransition-all duration-500"
+          className="h-full rounded-full bg-[#f97316] transition-all duration-500"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -47,7 +48,7 @@ export function MilestoneProgress() {
           <div
             key={i}
             className={`flex-1 rounded py-1 text-center text-xs font-medium ${
-              i < currentTier
+              i < currentTier || isComplete
                 ? "bg-white/20 text-white"
                 : i === currentTier
                   ? "border border-white/40 text-white"

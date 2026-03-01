@@ -37,7 +37,7 @@ export function useProposals() {
           publicClient.readContract({
             address: CONTRACT_ADDRESSES.governance,
             abi: GOVERNANCE_ABI,
-            functionName: "proposals",
+            functionName: "getProposal",
             args: [id],
           })
         )

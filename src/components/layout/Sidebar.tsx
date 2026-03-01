@@ -80,9 +80,9 @@ export function Sidebar({ open, onOpen, onClose, hiding }: { open: boolean; onOp
       <nav className="flex flex-1 flex-col gap-2 border border-white rounded-t-2xl border-b-0 bg-background -mt-px px-4 py-2">
         {NAV_ITEMS.map((item) => {
           const isActive =
-            item.href === "/create" || item.href === "/"
+            item.href === "/" || item.href === "/create"
               ? pathname === item.href
-              : pathname.startsWith(item.href)
+              : pathname === item.href || pathname.startsWith(item.href + "/")
 
           return (
             <Link
