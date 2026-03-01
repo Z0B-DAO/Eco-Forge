@@ -22,7 +22,6 @@ export const FOOTER_H = 28
 export function Footer() {
   return (
     <footer className="fixed bottom-0 left-0 right-0 z-[55] pointer-events-none">
-      <div className="h-[3px] w-full" style={{ background: "#E84142" }} />
       <div className="overflow-hidden bg-white py-0.5">
         <div
           className="flex whitespace-nowrap text-xs uppercase tracking-wider text-background md:text-sm"
@@ -32,7 +31,6 @@ export function Footer() {
           <span className="flex shrink-0 items-center"><MarqueeContent /></span>
         </div>
       </div>
-      <div className="h-[3px] w-full" style={{ background: "#E84142" }} />
     </footer>
   )
 }

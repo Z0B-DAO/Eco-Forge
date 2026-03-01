@@ -241,7 +241,7 @@ export default function AppLayout({
                 : { duration: phase === "settle" ? 0.6 : 1.2, ease: phase === "settle" ? [0.25, 0.1, 0.25, 1] : [0.45, 0, 0.1, 1] }
             }
           >
-            <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-3" style={{ paddingBottom: FOOTER_H }}>
+            <main className="mx-auto w-full max-w-7xl flex-1 min-h-0 px-6 py-3" style={{ paddingBottom: FOOTER_H }}>
               {children}
             </main>
           </motion.div>
@@ -262,7 +262,6 @@ export default function AppLayout({
             </h1>
           </div>
           <div className="w-full">
-            <div className="h-[3px] w-full" style={{ background: "#E84142" }} />
             <div className="overflow-hidden bg-white py-0.5">
               <div
                 className="flex whitespace-nowrap text-xs uppercase tracking-wider text-background md:text-sm"
@@ -282,7 +281,6 @@ export default function AppLayout({
                 ))}
               </div>
             </div>
-            <div className="h-[3px] w-full" style={{ background: "#E84142" }} />
           </div>
         </div>
       )}

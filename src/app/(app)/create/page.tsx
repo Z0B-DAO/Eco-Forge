@@ -114,7 +114,7 @@ export default function CreatePage() {
         <div className="grid gap-4 md:grid-cols-2">
           <button
             onClick={() => setPath("certified")}
-            className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-left transition-all hover:border-white/40 hover:bg-zinc-800/80"
+            className="rounded-xl border-[0.5px] border-white/60 bg-[#111111] p-6 text-left"
           >
             <div className="inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/80">
               Certified
@@ -132,7 +132,7 @@ export default function CreatePage() {
 
           <button
             onClick={() => setPath("community")}
-            className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-left transition-all hover:border-blue-500/40 hover:bg-zinc-800/80"
+            className="rounded-xl border-[0.5px] border-white/60 bg-[#111111] p-6 text-left"
           >
             <div className="inline-flex rounded-full border border-blue-500/30 bg-blue-500/15 px-3 py-1 text-xs font-medium text-blue-400">
               Community
@@ -163,7 +163,7 @@ export default function CreatePage() {
         </h1>
       </div>
 
-      <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+      <div className="space-y-4 rounded-xl border-[0.5px] border-white/60 bg-[#111111] p-6">
         <Field label="Project Name" value={form.projectName} onChange={(v) => updateField("projectName", v)} placeholder="Amazon Reforestation Block 42" />
 
         <div>

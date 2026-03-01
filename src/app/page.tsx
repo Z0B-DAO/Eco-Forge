@@ -237,7 +237,6 @@ export default function Home() {
 
             {/* Bottom marquee banner */}
             <div className="w-full">
-              <div className="h-[3px] w-full" style={{ background: "#E84142" }} />
               <div className="overflow-hidden bg-white py-0.5">
                 <div
                   className="flex whitespace-nowrap text-xs uppercase tracking-wider text-background md:text-sm"
@@ -247,7 +246,6 @@ export default function Home() {
                   <span className="flex shrink-0 items-center"><MarqueeContent /></span>
                 </div>
               </div>
-              <div className="h-[3px] w-full" style={{ background: "#E84142" }} />
             </div>
           </div>
 

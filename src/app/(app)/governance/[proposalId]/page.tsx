@@ -1,55 +1,61 @@
 "use client"
 
-import { use } from "react"
-import { usePublicClient } from "wagmi"
-import { useQuery } from "@tanstack/react-query"
-import { useVote } from "@/hooks/useVote"
-import { useGovernanceToken } from "@/hooks/useGovernanceToken"
-import { CONTRACT_ADDRESSES, GOVERNANCE_ABI } from "@/services/web3/contracts"
-import { LoadingBar } from "@/components/common/LoadingSpinner"
-import { ProposalType } from "@/types"
-import type { Proposal } from "@/types"
-import { timeFromNow, percentage, truncateAddress } from "@/lib/utils"
+import { use, useState, useCallback } from "react"
+import Link from "next/link"
+import { ProposalType, CreditOrigin, CreditStatus } from "@/types"
+import type { Proposal, CreditType } from "@/types"
+import { percentage } from "@/lib/utils"
+import { CreditCard } from "@/components/credits/CreditCard"
+import type { Listing } from "@/types"
+
+const now = Math.floor(Date.now() / 1000)
+
+interface ProposalMock extends Proposal {
+  creditId?: bigint
+}
+
+const MOCK_CREDITS: Record<string, CreditType> = {
+  "11": { id: 11n, projectName: "Chilean Lithium Wetland Offset", projectType: "Wetland Conservation", region: "Chile", vintageYear: 2024n, tonnesCO2e: 950n, totalSupply: 950n, impactScore: 58n, metadataURI: "", origin: CreditOrigin.CommunityVerified, status: CreditStatus.Suspended, issuer: "0xbadbadbadbadbadbadbadbadbadbadbadbadbadba", registrySource: "", retirementProof: "" },
+  "23": { id: 23n, projectName: "Siberian Permafrost Monitoring", projectType: "Wetland Conservation", region: "Russia", vintageYear: 2024n, tonnesCO2e: 550n, totalSupply: 550n, impactScore: 45n, metadataURI: "", origin: CreditOrigin.CommunityVerified, status: CreditStatus.Suspended, issuer: "0xrurururururururururururururururururururu0000", registrySource: "", retirementProof: "" },
+  "17": { id: 17n, projectName: "Bangladesh Solar Microgrid", projectType: "Renewable Energy", region: "Bangladesh", vintageYear: 2025n, tonnesCO2e: 750n, totalSupply: 750n, impactScore: 69n, metadataURI: "", origin: CreditOrigin.CommunityVerified, status: CreditStatus.Pending, issuer: "0xbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbd", registrySource: "", retirementProof: "" },
+  "19": { id: 19n, projectName: "Morocco Solar Desalination", projectType: "Renewable Energy", region: "Morocco", vintageYear: 2024n, tonnesCO2e: 1600n, totalSupply: 1600n, impactScore: 72n, metadataURI: "", origin: CreditOrigin.CommunityVerified, status: CreditStatus.Verified, issuer: "0xma0cma0cma0cma0cma0cma0cma0cma0cma0cma0c", registrySource: "", retirementProof: "" },
+  "20": { id: 20n, projectName: "Philippines Coral Reef Restoration", projectType: "Blue Carbon", region: "Philippines", vintageYear: 2025n, tonnesCO2e: 380n, totalSupply: 380n, impactScore: 67n, metadataURI: "", origin: CreditOrigin.CommunityVerified, status: CreditStatus.Pending, issuer: "0xphphphphphphphphphphphphphphphphphphphph00", registrySource: "", retirementProof: "" },
+}
+
+const MOCK_LISTINGS: Record<string, Listing> = {
+  "11": { listingId: 11n, creditId: 11n, seller: "0xbadbadbadbadbadbadbadbadbadbadbadbadbadba", amount: 950n, pricePerUnit: 800000000000000n, active: true },
+  "23": { listingId: 23n, creditId: 23n, seller: "0xrurururururururururururururururururururu0000", amount: 550n, pricePerUnit: 600000000000000n, active: true },
+  "17": { listingId: 17n, creditId: 17n, seller: "0xbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbd", amount: 750n, pricePerUnit: 1200000000000000n, active: true },
+  "19": { listingId: 19n, creditId: 19n, seller: "0xma0cma0cma0cma0cma0cma0cma0cma0cma0cma0c", amount: 800n, pricePerUnit: 1400000000000000n, active: true },
+  "20": { listingId: 20n, creditId: 20n, seller: "0xphphphphphphphphphphphphphphphphphphphph00", amount: 380n, pricePerUnit: 6100000000000000n, active: true },
+}
+
+const MOCK_PROPOSALS: Record<string, ProposalMock> = {
+  "1": { id: 1n, proposer: "0x1234567890abcdef1234567890abcdef12345678", pType: ProposalType.DisputeResolution, description: "Dispute: Chilean Lithium Wetland Offset — Satellite imagery shows no wetland restoration activity. Suspected fraudulent carbon credit issuance.", forVotes: 18n, againstVotes: 4n, deadline: BigInt(now + 86400 * 3), executed: false, creditId: 11n },
+  "2": { id: 2n, proposer: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd", pType: ProposalType.CreditEligibility, description: "Eligibility review: Should Direct Air Capture projects qualify for community-verified credits without third-party audit?", forVotes: 12n, againstVotes: 9n, deadline: BigInt(now + 86400 * 5), executed: false },
+  "3": { id: 3n, proposer: "0x9876543210fedcba9876543210fedcba98765432", pType: ProposalType.DisputeResolution, description: "Dispute: Siberian Permafrost Monitoring — Project claims CO2 sequestration from permafrost monitoring, but monitoring alone does not sequester carbon.", forVotes: 25n, againstVotes: 2n, deadline: BigInt(now + 86400 * 1), executed: false, creditId: 23n },
+  "4": { id: 4n, proposer: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef", pType: ProposalType.CreditEligibility, description: "Eligibility review: Propose minimum 50 impactScore threshold for community credits to be tradeable on marketplace.", forVotes: 31n, againstVotes: 7n, deadline: BigInt(now - 86400 * 2), executed: true },
+  "5": { id: 5n, proposer: "0xcafebabecafebabecafebabecafebabecafebabe", pType: ProposalType.DisputeResolution, description: "Dispute: Bangladesh Solar Microgrid — Issuer claimed 750 tCO2e offset but independent review estimates only 200 tCO2e. Possible overstatement.", forVotes: 8n, againstVotes: 14n, deadline: BigInt(now - 86400 * 5), executed: true, creditId: 17n },
+  "6": { id: 6n, proposer: "0xaabbccddaabbccddaabbccddaabbccddaabbccdd", pType: ProposalType.CreditEligibility, description: "Eligibility review: Add 'Biochar' as an officially recognized project type for certified credits from Verra registry.", forVotes: 22n, againstVotes: 3n, deadline: BigInt(now + 86400 * 7), executed: false },
+  "7": { id: 7n, proposer: "0x1111222233334444555566667777888899990000", pType: ProposalType.DisputeResolution, description: "Dispute: Morocco Solar Desalination — Project listed as Renewable Energy but desalination component has significant energy consumption not accounted for.", forVotes: 6n, againstVotes: 6n, deadline: BigInt(now + 86400 * 4), executed: false, creditId: 19n },
+  "8": { id: 8n, proposer: "0xffeeddccbbaa99887766554433221100ffeeddcc", pType: ProposalType.CreditEligibility, description: "Eligibility review: Require satellite imagery verification for all Reforestation credits regardless of origin (Certified or Community).", forVotes: 15n, againstVotes: 11n, deadline: BigInt(now - 86400 * 1), executed: false },
+  "9": { id: 9n, proposer: "0xdac0dac0dac0dac0dac0dac0dac0dac0dac0dac0", pType: ProposalType.DisputeResolution, description: "Dispute: Philippines Coral Reef Restoration — Community credit pending review. Local NGO reports project site is actually a commercial fishing zone.", forVotes: 19n, againstVotes: 1n, deadline: BigInt(now + 86400 * 6), executed: false, creditId: 20n },
+  "10": { id: 10n, proposer: "0x5555666677778888999900001111222233334444", pType: ProposalType.CreditEligibility, description: "Eligibility review: Increase challenge period from 7 days to 14 days for community credits with impactScore below 70.", forVotes: 10n, againstVotes: 10n, deadline: BigInt(now + 86400 * 2), executed: false },
+}
 
 export default function ProposalDetailPage({ params }: { params: Promise<{ proposalId: string }> }) {
   const { proposalId: proposalIdStr } = use(params)
-  const proposalId = BigInt(proposalIdStr)
-  const publicClient = usePublicClient()
+  const proposal = MOCK_PROPOSALS[proposalIdStr]
+  const [copied, setCopied] = useState(false)
+  const [hasVoted, setHasVoted] = useState(false)
 
-  const { data: proposal, isLoading } = useQuery({
-    queryKey: ["proposal", proposalIdStr],
-    enabled: !!publicClient,
-    queryFn: async () => {
-      if (!publicClient) throw new Error("No client")
-      return publicClient.readContract({
-        address: CONTRACT_ADDRESSES.governance,
-        abi: GOVERNANCE_ABI,
-        functionName: "proposals",
-        args: [proposalId],
-      }) as Promise<Proposal>
-    },
-  })
+  const copyAddress = useCallback(() => {
+    if (!proposal) return
+    navigator.clipboard.writeText(proposal.proposer)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }, [proposal])
 
-  const { vote, isPending, isConfirming, isConfirmed, error } = useVote()
-  const { balance } = useGovernanceToken()
-
-  return (
-    <LoadingBar isLoading={isLoading}>
-      <ProposalContent proposal={proposal} proposalId={proposalId} vote={vote} isPending={isPending} isConfirming={isConfirming} isConfirmed={isConfirmed} error={error} balance={balance} />
-    </LoadingBar>
-  )
-}
-
-function ProposalContent({ proposal, proposalId, vote, isPending, isConfirming, isConfirmed, error, balance }: {
-  proposal: Proposal | undefined
-  proposalId: bigint
-  vote: (id: bigint, support: boolean) => void
-  isPending: boolean
-  isConfirming: boolean
-  isConfirmed: boolean
-  error: Error | null
-  balance: bigint | undefined
-}) {
   if (!proposal) {
     return <p className="py-20 text-center text-zinc-400">Proposal not found.</p>
   }
@@ -57,10 +63,19 @@ function ProposalContent({ proposal, proposalId, vote, isPending, isConfirming, 
   const totalVotes = proposal.forVotes + proposal.againstVotes
   const forPct = percentage(proposal.forVotes, totalVotes)
   const isActive = Number(proposal.deadline) * 1000 > Date.now() && !proposal.executed
-  const votingPower = balance ? Number(balance) : 0
+
+  const deadlineDate = new Date(Number(proposal.deadline) * 1000)
+  const diffMs = deadlineDate.getTime() - Date.now()
+  const diffDays = Math.abs(Math.round(diffMs / (1000 * 60 * 60 * 24)))
+  const timeLabel = diffMs > 0 ? `ends in ${diffDays}d` : `ended ${diffDays}d ago`
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto h-full max-w-2xl overflow-y-auto space-y-6 py-3 pb-6">
+      <Link href="/governance" className="inline-flex items-center gap-2 rounded-xl border-[0.5px] border-white/60 bg-[#111111] px-4 py-2 text-base font-semibold text-white">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+        Back
+      </Link>
+
       <div>
         <div className="flex items-center gap-2">
           <span className={`rounded px-2 py-0.5 text-xs font-medium ${
@@ -80,16 +95,42 @@ function ProposalContent({ proposal, proposalId, vote, isPending, isConfirming, 
         </div>
         <h1 className="mt-3 text-2xl font-bold">Proposal #{Number(proposal.id)}</h1>
         <p className="mt-1 text-sm text-zinc-400">
-          Proposed by <span className="font-mono text-zinc-300">{truncateAddress(proposal.proposer)}</span> · {timeFromNow(proposal.deadline)}
+          Proposed by{" "}
+          <button
+            onClick={copyAddress}
+            className="relative font-mono text-zinc-300 hover:text-white transition-colors cursor-pointer"
+            title="Click to copy"
+          >
+            {proposal.proposer}
+            {copied && (
+              <span className="absolute inset-0 flex items-center justify-center gap-1.5 rounded-md bg-zinc-900 text-white text-sm font-sans">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Copied
+              </span>
+            )}
+          </button>
+          <span className="ml-1">· {timeLabel}</span>
         </p>
       </div>
 
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+      <div className="rounded-xl border-[0.5px] border-white/60 bg-[#111111] p-5">
         <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-500">Description</h3>
         <p className="mt-2 text-sm text-zinc-100">{proposal.description}</p>
       </div>
 
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+      {proposal.creditId !== undefined && MOCK_CREDITS[proposal.creditId.toString()] && (
+        <div>
+          <h3 className="mb-2 text-sm font-medium uppercase tracking-wider text-zinc-500">Contested Credit</h3>
+          <CreditCard
+            credit={MOCK_CREDITS[proposal.creditId.toString()]}
+            listing={MOCK_LISTINGS[proposal.creditId.toString()]}
+          />
+        </div>
+      )}
+
+      <div className="rounded-xl border-[0.5px] border-white/60 bg-[#111111] p-5">
         <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-500">Votes</h3>
 
         <div className="mt-4 space-y-3">
@@ -104,36 +145,36 @@ function ProposalContent({ proposal, proposalId, vote, isPending, isConfirming, 
         </div>
       </div>
 
-      {isActive && (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+      {isActive && !hasVoted && (
+        <div className="rounded-xl border-[0.5px] border-white/60 bg-[#111111] p-5">
           <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-500">Cast Your Vote</h3>
           <p className="mt-2 text-sm text-zinc-400">
-            Your voting power: <span className="font-medium text-zinc-100">{votingPower} token{votingPower !== 1 ? "s" : ""}</span>
+            Your voting power: <span className="font-medium text-zinc-100">3 tokens</span>
           </p>
 
-          {votingPower === 0 ? (
-            <p className="mt-3 text-sm text-yellow-400/80">You need governance tokens to vote.</p>
-          ) : (
-            <div className="mt-4 flex gap-3">
-              <button
-                onClick={() => vote(proposalId, true)}
-                disabled={isPending || isConfirming}
-                className="flex-1 rounded-lg border border-white/80 bg-white/5 backdrop-blur-sm py-2.5 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {isPending || isConfirming ? "Voting..." : "Vote FOR"}
-              </button>
-              <button
-                onClick={() => vote(proposalId, false)}
-                disabled={isPending || isConfirming}
-                className="flex-1 rounded-lg bg-red-600 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-500 disabled:opacity-50"
-              >
-                {isPending || isConfirming ? "Voting..." : "Vote AGAINST"}
-              </button>
-            </div>
-          )}
+          <div className="mt-4 flex gap-3">
+            <button
+              onClick={() => setHasVoted(true)}
+              className="flex-1 rounded-lg border border-white/80 bg-white/5 backdrop-blur-sm py-2.5 text-sm font-medium text-white"
+            >
+              Vote FOR
+            </button>
+            <button
+              onClick={() => setHasVoted(true)}
+              className="flex-1 rounded-lg bg-red-600 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-500"
+            >
+              Vote AGAINST
+            </button>
+          </div>
+        </div>
+      )}
 
-          {isConfirmed && <p className="mt-3 text-sm text-white">Vote submitted!</p>}
-          {error && <p className="mt-3 text-sm text-red-400">{error.message}</p>}
+      {hasVoted && (
+        <div className="rounded-xl border-[0.5px] border-white/60 bg-[#111111] px-5 py-4 text-sm text-zinc-300 flex items-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          You have already voted on this proposal.
         </div>
       )}
     </div>
