@@ -207,11 +207,11 @@ Even if someone retires the same credit on Verra twice (shouldn't be possible bu
 | Component | Technology |
 |-----------|------------|
 | Network | Avalanche C-Chain (Fuji Testnet for dev) |
-| Smart Contracts | Solidity ^0.8.20 |
+| Smart Contracts | Solidity ^0.8.24 |
 | Token Standard | ERC-1155 (OpenZeppelin) |
 | Development Framework | Foundry (forge, cast, anvil) |
 | Contract Testing | Foundry (Solidity tests with forge-std) |
-| Oracle | Chainlink (Data Feeds + Custom External Adapter) |
+| Oracle | Chainlink Functions (serverless, via chainlink-brownie-contracts) |
 | Wallet Integration | MetaMask / Core Wallet via wagmi + viem |
 
 ### AI Layer
@@ -272,50 +272,69 @@ The core token contract representing tokenized carbon credits.
 
 ```
 Contract: CarbonCredit (ERC-1155)
+├── Inherits: ERC1155, AccessControl, Pausable
 ├── Roles: MINTER_ROLE, VERIFIER_ROLE, ADMIN_ROLE (AccessControl)
 ├── Enums:
 │   ├── CreditOrigin { Certified, CommunityVerified }
 │   └── CreditStatus { Pending, Verified, Suspended, Retired }
 ├── Structs:
-│   └── CreditType {
-│         uint256 id
+│   ├── CreditType {
+│   │     uint256 id
+│   │     string projectName
+│   │     string projectType        // "reforestation", "renewable", "methane_capture"
+│   │     string region
+│   │     uint256 vintageYear
+│   │     uint256 tonnesCO2e        // tonnes of CO2 equivalent (for portfolio totals)
+│   │     uint256 totalSupply
+│   │     uint256 impactScore       // 0-100, set by AI via oracle
+│   │     string metadataURI        // IPFS link
+│   │     CreditOrigin origin       // Certified or CommunityVerified
+│   │     CreditStatus status       // Pending, Verified, Suspended, Retired
+│   │     address issuer
+│   │     string registrySource     // "Verra", "Gold Standard", "" if native
+│   │     string retirementProof    // Registry serial number / IPFS link to proof, "" if native
+│   │ }
+│   └── CreditParams {              // helper struct to avoid stack-too-deep
 │         string projectName
-│         string projectType        // "reforestation", "renewable", "methane_capture"
+│         string projectType
 │         string region
 │         uint256 vintageYear
-│         uint256 tonnesCO2e        // tonnes of CO2 equivalent (for portfolio totals)
-│         uint256 totalSupply
-│         uint256 impactScore       // 0-100, set by AI via oracle
-│         string metadataURI        // IPFS link
-│         CreditOrigin origin       // Certified or CommunityVerified
-│         CreditStatus status       // Pending, Verified, Suspended, Retired
-│         address issuer
-│         string registrySource     // "Verra", "Gold Standard", "" if native
-│         string retirementProof    // Registry serial number / IPFS link to proof, "" if native
+│         uint256 tonnesCO2e
+│         uint256 initialSupply
+│         string metadataURI
 │     }
 ├── Mappings:
 │   ├── creditTypes: id => CreditType
 │   ├── retiredCredits: address => id => amount
 │   ├── usedRetirementProofs: bytes32 => bool  // hash(registrySource+serial) → prevents double-bridge
-│   └── blacklisted: address => bool            // fraudulent issuers
+│   ├── blacklisted: address => bool            // fraudulent issuers
+│   └── disputed: id => bool                    // flagged during challenge period
 ├── Functions:
-│   ├── createCertifiedCredit(params, registrySource, retirementProof)
-│   │     → onlyRole(MINTER_ROLE), notBlacklisted
+│   ├── createCertifiedCredit(params, registrySource, retirementProof, issuer, verified)
+│   │     → onlyRole(MINTER_ROLE), notBlacklisted, whenNotPaused
+│   │     → params: CreditParams struct
+│   │     → issuer: address to mint tokens to (MINTER_ROLE acts on behalf)
+│   │     → verified: bool — true if AI confidence high (Verified), false (Pending)
 │   │     → reverts if retirement proof hash already used
+│   │     → reverts if issuer is blacklisted
 │   │     → stores hash in usedRetirementProofs
-│   │     → status = Verified (if AI confidence high) or Pending (if low)
 │   ├── createCommunityCredit(params)
-│   │     → public, notBlacklisted
-│   │     → always minted as Pending
+│   │     → public, notBlacklisted, whenNotPaused
+│   │     → always minted as Pending, issuer = msg.sender
 │   ├── verifyCommunityCredit(id) → onlyRole(VERIFIER_ROLE) // after DAO challenge period
 │   ├── mintCredits(id, to, amount) → onlyRole(MINTER_ROLE)
-│   ├── updateImpactScore(id, score) → onlyRole(VERIFIER_ROLE) // called by oracle
-│   ├── retireCredits(id, amount) → public // burn mechanism
-│   ├── blacklist(address) → onlyRole(ADMIN_ROLE) or onlyGovernance
+│   ├── updateImpactScore(id, score) → onlyRole(VERIFIER_ROLE) // called by oracle, score 0-100
+│   ├── retireCredits(id, amount) → public // burn mechanism, updates retiredCredits
+│   ├── suspendCredit(id) → onlyRole(ADMIN_ROLE) // sets status to Suspended
+│   ├── setDisputed(id, disputed) → onlyRole(ADMIN_ROLE) // flag/unflag during challenge
+│   ├── blacklist(issuer, creditId) → onlyRole(ADMIN_ROLE) // permanent, emits event with creditId
 │   ├── isBlacklisted(address) → view
 │   ├── isRetirementProofUsed(bytes32 hash) → view
+│   ├── isDisputed(id) → view
 │   ├── getCreditType(id) → view
-│   └── uri(id) → override // returns IPFS metadata
+│   ├── uri(id) → override // returns IPFS metadataURI
+│   ├── pause() → onlyRole(ADMIN_ROLE)
+│   └── unpause() → onlyRole(ADMIN_ROLE)
 ├── Modifiers:
 │   └── notBlacklisted(msg.sender) → on createCertifiedCredit + createCommunityCredit
 └── Events (all indexed for frontend event filtering):
@@ -333,6 +352,7 @@ Handles listing, buying, and selling carbon credits.
 
 ```
 Contract: Marketplace
+├── Inherits: ReentrancyGuard
 ├── Structs:
 │   └── Listing {
 │         uint256 listingId
@@ -343,21 +363,30 @@ Contract: Marketplace
 │         bool active
 │     }
 ├── State:
+│   ├── carbonCredit: CarbonCredit (immutable reference)
 │   ├── listings: listingId => Listing
 │   ├── lastSoldPrice: creditId => uint256  // updated on each sale (for portfolio valuation)
 │   ├── platformFee: uint256 (basis points, e.g., 250 = 2.5%)
-│   └── feeRecipient: address (DAO treasury)
+│   ├── feeRecipient: address (DAO treasury)
+│   └── accumulatedFees: uint256 // pull-pattern fee collection
+├── Constructor: (carbonCreditAddress, platformFee, feeRecipient)
 ├── Functions:
 │   ├── listCredits(creditId, amount, pricePerUnit) → public
-│   ├── buyCredits(listingId, amount) → payable // also updates lastSoldPrice
+│   │     → verifies credit status == Verified (only verified credits can be listed)
+│   │     → verifies seller has sufficient balance + approval
+│   ├── buyCredits(listingId, amount) → payable, nonReentrant
+│   │     → transfers credits, pays seller minus fee, updates lastSoldPrice
+│   │     → refunds excess payment
 │   ├── cancelListing(listingId) → onlySeller
-│   ├── updatePrice(listingId, newPrice) → onlySeller
+│   ├── updatePrice(listingId, newPrice) → onlySeller // emits PriceUpdated
 │   ├── getLastSoldPrice(creditId) → view
-│   └── withdrawFees() → onlyFeeRecipient
+│   ├── getListing(listingId) → view // returns full Listing struct
+│   └── withdrawFees() → onlyFeeRecipient, nonReentrant
 └── Events (all indexed for frontend event filtering):
     ├── Listed(uint256 indexed listingId, uint256 indexed creditId, address indexed seller, uint256 amount, uint256 price)
     ├── Sold(uint256 indexed listingId, address indexed buyer, uint256 indexed creditId, uint256 amount, uint256 totalPrice)
-    └── ListingCancelled(uint256 indexed listingId)
+    ├── ListingCancelled(uint256 indexed listingId)
+    └── PriceUpdated(uint256 indexed listingId, uint256 newPrice)
 ```
 
 ### 6.3 EcoForgeGovernance.sol — DAO
@@ -366,40 +395,73 @@ Focused governance for credit standards and dispute resolution.
 
 ```
 Contract: EcoForgeGovernance
+├── Enums:
+│   ├── ProposalType { CreditEligibility, DisputeResolution }
+│   └── DisputeStatus { Open, Resolved, Rejected }
 ├── Structs:
 │   ├── Proposal {
-│         uint256 id
-│         address proposer
-│         ProposalType pType       // CreditEligibility, DisputeResolution
-│         string description
-│         uint256 forVotes
-│         uint256 againstVotes
-│         uint256 deadline
-│         bool executed
-│         bytes calldata           // action to execute
-│     }
-│   └── Dispute {
-│         uint256 creditId
+│   │     uint256 id
+│   │     address proposer
+│   │     ProposalType pType
+│   │     string description
+│   │     uint256 forVotes
+│   │     uint256 againstVotes
+│   │     uint256 deadline
+│   │     bool executed
+│   │     bytes actionCalldata     // action to execute (named to avoid reserved word)
+│   │ }
+│   ├── Dispute {
+│   │     uint256 creditId
+│   │     address challenger
+│   │     string reason
+│   │     DisputeStatus status
+│   │ }
+│   └── DisputeStake {             // tracks staked tokens per dispute
 │         address challenger
-│         string reason
-│         DisputeStatus status     // Open, Resolved, Rejected
+│         uint256 amount
+│         bool returned
 │     }
-├── Token: EcoForgeToken (ERC-20) — see 6.4b
-├── Functions:
-│   ├── propose(type, description, calldata) → minTokenBalance required
-│   ├── vote(proposalId, support) → public, weight = token balance
-│   ├── execute(proposalId) → quorumReached + deadline passed
-│   ├── disputeCredit(creditId, reason) → public // auto-creates a DisputeResolution proposal
-│   └── resolveDispute(disputeId, resolution) → onlyGovernance // called by execute()
+├── References: EcoForgeToken (immutable), CarbonCredit (immutable)
+├── State:
+│   ├── proposals: proposalId => Proposal
+│   ├── disputes: disputeId => Dispute
+│   ├── disputeStakes: disputeId => DisputeStake
+│   ├── hasVoted: proposalId => voter => bool
+│   ├── disputeToProposal: disputeId => proposalId
+│   └── proposalToDispute: proposalId => disputeId
 ├── Constants:
 │   ├── VOTING_PERIOD: 7 days
 │   ├── QUORUM_PERCENTAGE: 10% of total supply
-│   └── MIN_PROPOSAL_TOKENS: minimum tokens to create a proposal
+│   ├── minProposalTokens: immutable (set in constructor)
+│   ├── disputeStakeAmount: immutable (set in constructor)
+│   └── disputeBonusAmount: immutable (bonus for successful challenger)
+├── Constructor: (governanceToken, carbonCredit, minProposalTokens, disputeStakeAmount, disputeBonusAmount)
+├── Functions:
+│   ├── propose(pType, description, actionCalldata) → requires minProposalTokens balance
+│   ├── vote(proposalId, support) → weight = token balance, no double vote
+│   │     → calls governanceToken.recordAction(voter) via try/catch (best-effort milestone reward)
+│   ├── execute(proposalId) → quorumReached + deadline passed + majority FOR
+│   │     → DisputeResolution: auto-resolves dispute (suspend + return stake + bonus + burnAll + blacklist)
+│   │     → CreditEligibility: executes stored actionCalldata via address(this).call()
+│   ├── disputeCredit(creditId, reason) → public
+│   │     → burns disputeStakeAmount tokens from challenger (lock via burn)
+│   │     → auto-creates a DisputeResolution proposal
+│   │     → marks credit as disputed on-chain (carbonCredit.setDisputed)
+│   ├── resolveDisputeAgainst(disputeId) → external, callable after vote fails
+│   │     → sets dispute to Rejected, unflags credit, staked tokens already burned (not returned)
+│   ├── getProposal(proposalId) → view
+│   ├── getDispute(disputeId) → view
+│   ├── getDisputeStake(disputeId) → view
+│   ├── hasVoted(proposalId, voter) → view
+│   └── getDisputeProposalId(disputeId) → view
 └── Events (all indexed for frontend event filtering):
     ├── ProposalCreated(uint256 indexed id, address indexed proposer, ProposalType pType)
     ├── Voted(uint256 indexed proposalId, address indexed voter, bool support, uint256 weight)
     ├── ProposalExecuted(uint256 indexed id)
-    └── DisputeRaised(uint256 indexed creditId, address indexed challenger, uint256 indexed autoProposalId)
+    ├── DisputeRaised(uint256 indexed creditId, address indexed challenger, uint256 indexed autoProposalId)
+    ├── DisputeStaked(uint256 indexed disputeId, address indexed challenger, uint256 amount)
+    ├── DisputeStakeReturned(uint256 indexed disputeId, address indexed challenger, uint256 amount)
+    └── DisputeStakeBurned(uint256 indexed disputeId, address indexed challenger, uint256 amount)
 ```
 
 ### 6.4b EcoForgeToken.sol — Governance Token
@@ -409,27 +471,35 @@ ERC-20 token used for voting power in the DAO. Earned through milestone-based ac
 ```
 Contract: EcoForgeToken (ERC-20)
 ├── Inherits: ERC20, AccessControl
-├── Roles: MINTER_ROLE (held by CarbonCredit, Marketplace, Governance contracts + admin)
+├── Soulbound: _update() override blocks all transfers (only mint/burn allowed)
+├── Roles: MINTER_ROLE (held by Governance contract + admin)
 ├── Structs:
 │   └── Milestone {
 │         uint256 actionsRequired      // cumulative actions needed
 │         uint256 tokensRewarded       // tokens minted at this milestone
 │     }
 ├── State:
-│   ├── milestones: Milestone[]        // hardcoded tiers (Option A)
+│   ├── milestones: Milestone[]        // hardcoded tiers
 │   ├── userActions: address => uint256  // cumulative action count per wallet
-│   ├── userMilestone: address => uint256 // last milestone reached per wallet
-│   └── dailyActionCap: uint256        // max actions counted per wallet per day (anti-sybil)
+│   ├── userMilestone: address => uint256 // next milestone index to reach
+│   ├── dailyActionCap: uint256        // max actions counted per wallet per day (anti-sybil)
+│   └── dailyActions: address => day => count // daily tracking per wallet
+├── Constructor: (dailyActionCap)
 ├── Functions:
 │   ├── recordAction(user) → onlyRole(MINTER_ROLE)
 │   │     // Called by other contracts on each qualifying action
+│   │     // Checks daily action cap (reverts if exceeded)
 │   │     // Increments userActions[user]
 │   │     // If new milestone reached → auto-mint tokens to user
+│   ├── mint(to, amount) → onlyRole(MINTER_ROLE)
+│   │     // Used by Governance to return dispute stakes + bonus to challengers
+│   │     // Necessary because soulbound tokens can't be transferred, so stake
+│   │     // return works via burn-at-stake → re-mint-on-win pattern
 │   ├── burn(user, amount) → onlyRole(MINTER_ROLE) // for punishments
 │   ├── burnAll(user) → onlyRole(MINTER_ROLE) // burn entire balance (fraud penalty)
 │   ├── getMilestones() → view
 │   ├── getUserProgress(user) → view // returns { actions, currentMilestone, nextMilestone, tokensEarned }
-│   └── transfer/transferFrom → DISABLED (non-transferable, soulbound)
+│   └── transfer/transferFrom → DISABLED (revert "non-transferable")
 ├── Milestone Tiers (hardcoded, adjustable before deploy):
 │   ├── Tier 1:   5 actions  → 1 token   (total: 1)
 │   ├── Tier 2:  15 actions  → 2 tokens  (total: 3)
@@ -443,10 +513,10 @@ Contract: EcoForgeToken (ERC-20)
 │   ├── Buy a credit
 │   ├── Sell a credit
 │   ├── Retire (burn) a credit
-│   ├── Vote on a proposal
+│   ├── Vote on a proposal (via try/catch — best-effort, won't block vote if cap hit)
 │   └── Submit a dispute that gets accepted
 ├── Anti-sybil:
-│   ├── Max actions counted per wallet per day (e.g., 10)
+│   ├── Max actions counted per wallet per day (constructor param, e.g., 10)
 │   ├── Non-transferable tokens → can't consolidate across wallets
 │   └── Actions cost gas → makes mass wallet creation expensive
 └── Events (all indexed for frontend event filtering):
@@ -463,58 +533,75 @@ Anti-fraud and anti-spam mechanisms across all contracts.
 ```
 CASE 1: Fraudulent credit detected (via DAO dispute vote)
 ─────────────────────────────────────────────────────────
-Trigger: Dispute vote passes (FOR wins)
-Actions:
-  1. CarbonCredit.updateStatus(creditId, Suspended) — credit no longer tradeable
-  2. EcoForgeToken.burnAll(issuer) — issuer loses ALL governance tokens
-  3. CarbonCredit.blacklist(issuer) — issuer can never create credits again
-Executed automatically by EcoForgeGovernance.execute()
+Trigger: Dispute vote passes (FOR wins) → execute(proposalId) called
+Actions (executed automatically by _resolveDisputeForWin):
+  1. Challenger's staked tokens returned (re-minted via governanceToken.mint)
+  2. Challenger receives bonus tokens (disputeBonusAmount)
+  3. CarbonCredit.suspendCredit(creditId) — credit no longer tradeable
+  4. EcoForgeToken.burnAll(issuer) — issuer loses ALL governance tokens
+  5. CarbonCredit.blacklist(issuer, creditId) — issuer can never create credits again
 
 CASE 2: False dispute (spam/malicious challenge)
 ─────────────────────────────────────────────────
-Trigger: Dispute vote fails (AGAINST wins)
-Prerequisite: Challenger must stake governance tokens to submit a dispute
+Trigger: Dispute vote fails (AGAINST wins) → resolveDisputeAgainst(disputeId) called
 Actions:
-  1. Staked tokens are burned (EcoForgeToken.burn(challenger, stakeAmount))
+  1. Staked tokens already burned at dispute creation (not re-minted = permanent loss)
   2. Dispute status set to Rejected
-  3. Credit returns to normal status
+  3. Credit unflagged as disputed (carbonCredit.setDisputed(creditId, false))
 
 CASE 3: Successful dispute (legitimate challenge)
 ─────────────────────────────────────────────────
-Trigger: Dispute vote passes (FOR wins)
-Actions:
-  1. Staked tokens are returned to challenger
-  2. Challenger receives bonus tokens (reward for protecting the platform)
-  3. Fraudulent issuer is punished (see Case 1)
+Same as CASE 1 — triggered by execute(proposalId) when FOR wins.
 
-DISPUTE STAKE AMOUNT:
+DISPUTE STAKE MECHANISM:
   - Must stake minimum DISPUTE_STAKE_AMOUNT governance tokens to submit dispute
   - If you don't have enough tokens → can't dispute (prevents spam from new accounts)
-  - Staked tokens are locked until the vote resolves
+  - Staking = tokens are BURNED (not locked, because soulbound tokens can't be transferred)
+  - On win: tokens are RE-MINTED to challenger (burn-at-stake → re-mint-on-win pattern)
+  - On loss: tokens stay burned (permanent loss as punishment)
+  - Credit is marked as disputed on-chain (carbonCredit.setDisputed(creditId, true))
 ```
 
 Additions to existing contracts for punishment support:
 
 ```
-CarbonCredit.sol — additions:
+CarbonCredit.sol — punishment additions:
 ├── Mappings:
-│   └── blacklisted: address => bool
+│   ├── blacklisted: address => bool
+│   └── disputed: id => bool                // flagged during challenge period
 ├── Functions:
-│   ├── blacklist(address) → onlyRole(ADMIN_ROLE) or onlyGovernance
-│   └── isBlacklisted(address) → view
+│   ├── suspendCredit(id) → onlyRole(ADMIN_ROLE) // sets status to Suspended
+│   ├── setDisputed(id, disputed) → onlyRole(ADMIN_ROLE) // flag/unflag during challenge
+│   ├── blacklist(issuer, creditId) → onlyRole(ADMIN_ROLE) // Governance contract granted ADMIN_ROLE
+│   ├── isBlacklisted(address) → view
+│   └── isDisputed(id) → view
 ├── Modifiers:
 │   └── notBlacklisted(msg.sender) on createCertifiedCredit + createCommunityCredit
 └── Events:
-    └── IssuerBlacklisted(address, creditId)
+    └── IssuerBlacklisted(address indexed issuer, uint256 creditId)
 
-EcoForgeGovernance.sol — additions:
+EcoForgeToken.sol — punishment/stake additions:
+├── Functions:
+│   └── mint(to, amount) → onlyRole(MINTER_ROLE)
+│         // Used by Governance to return dispute stakes + bonus
+│         // Necessary because soulbound tokens can't be transferred
+
+EcoForgeGovernance.sol — dispute/punishment additions:
 ├── State:
-│   └── disputeStakes: disputeId => { challenger, amount, returned }
+│   ├── disputeStakes: disputeId => DisputeStake { challenger, amount, returned }
+│   ├── disputeToProposal: disputeId => proposalId
+│   └── proposalToDispute: proposalId => disputeId
 ├── Constants:
-│   └── DISPUTE_STAKE_AMOUNT: minimum tokens to stake for a dispute
-├── Functions (updated):
-│   ├── disputeCredit(creditId, reason) → requires staking DISPUTE_STAKE_AMOUNT tokens
-│   └── resolveDispute() → now also handles stake return/burn + issuer punishment
+│   ├── disputeStakeAmount: immutable (set in constructor)
+│   └── disputeBonusAmount: immutable (bonus for successful challenger)
+├── Functions:
+│   ├── disputeCredit(creditId, reason) → burns stake tokens, auto-creates proposal, marks credit disputed
+│   ├── execute(proposalId) → for DisputeResolution: calls _resolveDisputeForWin (suspend + return + bonus + burnAll + blacklist)
+│   │                        → for CreditEligibility: executes stored actionCalldata
+│   └── resolveDisputeAgainst(disputeId) → external, for when AGAINST wins (burn stake, reject, unflag)
+├── Role requirements (set in Deploy.s.sol):
+│   ├── Governance needs MINTER_ROLE on EcoForgeToken (for burn, burnAll, mint, recordAction)
+│   └── Governance needs ADMIN_ROLE on CarbonCredit (for suspendCredit, blacklist, setDisputed)
 └── Events (all indexed for frontend event filtering):
     ├── DisputeStaked(uint256 indexed disputeId, address indexed challenger, uint256 amount)
     ├── DisputeStakeReturned(uint256 indexed disputeId, address indexed challenger, uint256 amount)
@@ -567,25 +654,31 @@ Installed via `forge install`:
 ```bash
 forge install OpenZeppelin/openzeppelin-contracts
 forge install smartcontractkit/chainlink
+forge install smartcontractkit/chainlink-brownie-contracts
 forge install foundry-rs/forge-std
 ```
 
 ```
-OpenZeppelin (lib/openzeppelin-contracts):
-  ├── ERC1155
-  ├── AccessControl
-  ├── ReentrancyGuard
-  ├── Pausable
-  └── ERC20 (governance token)
+OpenZeppelin (lib/openzeppelin-contracts) v5.6.1:
+  ├── ERC1155           (CarbonCredit)
+  ├── AccessControl     (CarbonCredit, EcoForgeToken, EcoForgeOracle)
+  ├── Pausable          (CarbonCredit)
+  ├── ReentrancyGuard   (Marketplace)
+  └── ERC20             (EcoForgeToken — soulbound via _update override)
 
-Chainlink (lib/chainlink):
-  ├── ChainlinkClient (for external adapter requests)
-  └── AggregatorV3Interface (for price feeds)
+Chainlink Brownie Contracts (lib/chainlink-brownie-contracts) v1.3:
+  ├── FunctionsClient   (EcoForgeOracle — v1_3_0)
+  └── FunctionsRequest  (EcoForgeOracle — v1_0_0 library)
 
-Forge Std (lib/forge-std):
+Forge Std (lib/forge-std) v1.15.0:
   ├── Test (base test contract)
-  ├── console2 (logging)
+  ├── console (logging)
   └── Script (deployment scripts)
+
+Role Grant Requirements (set in Deploy.s.sol):
+  ├── Governance contract → MINTER_ROLE on EcoForgeToken (burn, burnAll, mint, recordAction)
+  ├── Governance contract → ADMIN_ROLE on CarbonCredit (suspendCredit, blacklist, setDisputed)
+  └── Oracle contract → VERIFIER_ROLE on CarbonCredit (updateImpactScore)
 ```
 
 ### 6.6 Foundry Configuration
@@ -596,7 +689,7 @@ Forge Std (lib/forge-std):
 src = "src/contracts"
 out = "out"
 libs = ["lib"]
-solc_version = "0.8.20"
+solc_version = "0.8.24"
 optimizer = true
 optimizer_runs = 200
 
@@ -612,6 +705,7 @@ fuji = { key = "${SNOWTRACE_API_KEY}", url = "https://api-testnet.snowtrace.io/a
 # Also defined in remappings.txt:
 # @openzeppelin/=lib/openzeppelin-contracts/
 # @chainlink/=lib/chainlink/
+# @chainlink-contracts/=lib/chainlink-brownie-contracts/contracts/src/v0.8/
 # forge-std/=lib/forge-std/src/
 ```
 
@@ -752,12 +846,32 @@ Flow:
 
 ```
 Contract: EcoForgeOracle
-├── Inherits: FunctionsClient (Chainlink Functions)
+├── Inherits: FunctionsClient (Chainlink Functions v1.3), AccessControl
+├── Roles: ADMIN_ROLE, REQUESTER_ROLE
+├── State:
+│   ├── carbonCredit: CarbonCredit (immutable)
+│   ├── donId: bytes32
+│   ├── subscriptionId: uint64
+│   ├── callbackGasLimit: uint32 (default 300,000)
+│   ├── source: string (JS code executed by DON)
+│   └── pendingRequests: requestId => creditId
+├── Constructor: (router, carbonCredit, donId, subscriptionId, source)
 ├── Functions:
-│   ├── requestImpactScore(creditId) → sends Chainlink Functions request
-│   ├── fulfillRequest(requestId, response, err) → callback, updates score on-chain
-│   └── setDonId(donId) → onlyAdmin
-└── Access: Only authorized contracts can make requests
+│   ├── requestImpactScore(creditId) → onlyRole(REQUESTER_ROLE)
+│   │     → builds FunctionsRequest, passes creditId as string arg, sends to DON
+│   ├── _fulfillRequest(requestId, response, err) → internal callback from DON
+│   │     → decodes score, clamps 0-100, calls carbonCredit.updateImpactScore
+│   ├── setDonId(donId) → onlyRole(ADMIN_ROLE)
+│   ├── setSubscriptionId(subscriptionId) → onlyRole(ADMIN_ROLE)
+│   ├── setSource(source) → onlyRole(ADMIN_ROLE)
+│   └── setCallbackGasLimit(limit) → onlyRole(ADMIN_ROLE)
+├── Role requirements (set in Deploy.s.sol):
+│   └── Oracle needs VERIFIER_ROLE on CarbonCredit (for updateImpactScore)
+├── Dependency: lib/chainlink-brownie-contracts (FunctionsClient v1.3)
+└── Events:
+    ├── ScoreRequested(bytes32 indexed requestId, uint256 indexed creditId)
+    ├── ScoreFulfilled(bytes32 indexed requestId, uint256 indexed creditId, uint256 score)
+    └── ScoreRequestFailed(bytes32 indexed requestId, uint256 indexed creditId, bytes error)
 ```
 
 ### 8.3 Fuji Testnet Chainlink Setup
