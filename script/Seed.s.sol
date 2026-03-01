@@ -10,10 +10,10 @@ import {EcoForgeToken} from "../src/contracts/EcoForgeToken.sol";
 /// @notice Run after Deploy.s.sol. Fill contract addresses below.
 /// @dev forge script script/Seed.s.sol --rpc-url $FUJI_RPC_URL --broadcast
 contract Seed is Script {
-    // ──────── Fill these after deployment ────────
-    address constant CARBON_CREDIT_ADDR = address(0); // TODO: fill
-    address constant MARKETPLACE_ADDR = address(0); // TODO: fill
-    address constant TOKEN_ADDR = address(0); // TODO: fill
+    // ──────── Deployed on Fuji ────────
+    address constant CARBON_CREDIT_ADDR = 0x292834ceD52eA68190444E5a6F324906f0F0B449;
+    address constant MARKETPLACE_ADDR = 0x3f0Fa80C11bAc6c9f132922407A4ecf9E2Ad0614;
+    address constant TOKEN_ADDR = 0x4E55dDCc3548870906F458A898c742CC6152E25E;
 
     function run() external {
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
@@ -97,10 +97,6 @@ contract Seed is Script {
         mp.listCredits(certId1, 100, 0.5 ether); // 100 units at 0.5 AVAX each
         mp.listCredits(certId2, 50, 0.3 ether); // 50 units at 0.3 AVAX each
         mp.listCredits(commId1, 75, 0.1 ether); // 75 units at 0.1 AVAX each
-
-        // ──────────────── 6. Simulate a sale (for lastSoldPrice) ───────────
-        // Buy 10 units of certId1 listing (listing #1)
-        mp.buyCredits{value: 5 ether}(1, 10);
 
         vm.stopBroadcast();
     }
